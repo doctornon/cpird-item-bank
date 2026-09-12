@@ -54,16 +54,17 @@ export default function ExamSets({sb,bp,me,notify}){
  const stats=coverage(plan,items.map(x=>x.detail));
  const spec=sel&&sel.spec_version?scaledTargets(sel.spec_version,sel.target_count):null;
  const setIcd={};
- if(spec)items.forEach(x=>{const c=x.detail&&x.detail.icd_system;if(c)setIcd[c]=(setIcd[c]||0)+1;});
+ const setIcdG={};
+ if(spec)items.forEach(x=>{const d=x.detail;if(d&&d.icd_system){const c=d.icd_system;setIcd[c]=(setIcd[c]||0)+1;const g=setIcdG[c]||(setIcdG[c]={2:0,3:0,o:0});if(d.nl_group===2)g[2]++;else if(d.nl_group===3)g[3]++;else g.o++;}});
  // magic selection quality signals
  const usedBefore=(p)=>!!qmap[p.id]||p.use_count>0;
  const isGood=(p)=>{const s=qmap[p.id];if(!s)return true;if(s.discrimination!=null&&s.discrimination<0.15)return false;if(s.p_value!=null&&(s.p_value<0.2||s.p_value>0.9))return false;return true;};
  const rec=(p)=>{const used=usedBefore(p),good=isGood(p);if(used&&!good)return{tag:'ควรปรับปรุง',cls:'gap-short'};if(used&&good)return{tag:'เคยใช้ · ทำ parallel',cls:'gap-over'};return{tag:'ยังไม่เคยใช้ · ใช้ได้เลย',cls:'gap-ok'};};
  const qscore=(p)=>usedBefore(p)?(isGood(p)?1:0):2;
- const magicFill=(icdCode,need)=>mutate(async()=>{
+ const magicFill=(icdCode,group,need)=>mutate(async()=>{
   const have=new Set(items.map(x=>String(x.item_id)));
-  const cands=pool.filter(p=>p.status==='approved'&&p.icd_system===icdCode&&!have.has(String(p.id)));
-  if(!cands.length)throw Error('ไม่มีข้อในคลังสำหรับระบบนี้ — แนะนำให้ออกข้อใหม่');
+  const cands=pool.filter(p=>p.status==='approved'&&p.icd_system===icdCode&&(group?p.nl_group===group:true)&&!have.has(String(p.id)));
+  if(!cands.length)throw Error('ไม่มีข้อในคลัง (ระบบ/กลุ่มนี้) — แนะนำให้ออกข้อใหม่');
   const ranked=[...cands].sort((a,b)=>qscore(b)-qscore(a)).slice(0,need);
   const base=items.length?Math.max(...items.map(x=>x.position)):0;
   await query(sb.from('exam_set_items').insert(ranked.map((p,i)=>({exam_set_id:sel.id,item_id:p.id,position:base+i+1,points:1}))));
@@ -108,9 +109,9 @@ export default function ExamSets({sb,bp,me,notify}){
  {(()=>{const d=setCat1-spec.category1.target;return <tr><td>หมวด1 ทั่วไป (ส่งเสริม/จริยธรรม/นิติเวช)</td><td>{spec.category1.target}</td><td>{setCat1}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td/></tr>;})()}
  {(()=>{const d=setG1-spec.group1.target;const avail=pool.filter(p=>p.status==='approved'&&p.nl_group===1&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr><td>กลุ่มฉุกเฉิน (group 1)</td><td>{spec.group1.target}</td><td>{setG1}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFillG1(-d)}>✨ เติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})()}
  </tbody></table></div>
- <div className="mk" style={{margin:'12px 0 6px'}}>โรคตามระบบ (กลุ่ม 2+3)</div>
- <div className="tablewrap"><table><thead><tr><th>ระบบโรค (ICD)</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th><th>เติมอัตโนมัติ (magic)</th></tr></thead><tbody>
- {spec.systems.filter(s=>s.target>0||setIcd[s.code]).map(s=>{const a=setIcd[s.code]||0;const d=a-s.target;const avail=pool.filter(p=>p.status==='approved'&&p.icd_system===s.code&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr key={s.code}><td title={s.th}>{s.roman}. {s.th}</td><td>{s.target}</td><td>{a}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFill(s.code,-d)}>✨ เติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})}
+ <div className="mk" style={{margin:'12px 0 6px'}}>โรคตามระบบ (แยกกลุ่ม 2 / 3) — แสดง มี/เป้า</div>
+ <div className="tablewrap"><table><thead><tr><th>ระบบโรค (ICD)</th><th>กลุ่ม 2 (มี/เป้า)</th><th>กลุ่ม 3 (มี/เป้า)</th><th>เติมอัตโนมัติ (magic)</th></tr></thead><tbody>
+ {spec.systems.filter(s=>s.target>0||setIcdG[s.code]).map(s=>{const g=setIcdG[s.code]||{2:0,3:0,o:0};const d2=g[2]-s.g2,d3=g[3]-s.g3;const av2=pool.filter(p=>p.status==='approved'&&p.icd_system===s.code&&p.nl_group===2&&!items.some(x=>String(x.item_id)===String(p.id))).length;const av3=pool.filter(p=>p.status==='approved'&&p.icd_system===s.code&&p.nl_group===3&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr key={s.code}><td title={s.th}>{s.roman}. {s.th}{g.o>0?<span className="muted"> · ยังไม่ระบุกลุ่ม {g.o}</span>:''}</td><td className={d2<0?'gap-short':d2>0?'gap-over':'gap-ok'}>{g[2]}/{s.g2}</td><td className={d3<0?'gap-short':d3>0?'gap-over':'gap-ok'}>{g[3]}/{s.g3}</td><td><div className="row" style={{gap:4}}>{d2<0&&(av2>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFill(s.code,2,-d2)}>✨ก2 {Math.min(-d2,av2)}</button>:<span className="gap-short">ก2 ออกใหม่</span>)}{d3<0&&(av3>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFill(s.code,3,-d3)}>✨ก3 {Math.min(-d3,av3)}</button>:<span className="gap-short">ก3 ออกใหม่</span>)}</div></td></tr>;})}
  </tbody></table></div>
  {taskGap&&<><div className="mk" style={{margin:'12px 0 6px'}}>สัดส่วนตามภารกิจแพทย์ (เกณฑ์ 2569)</div>
  <div className="tablewrap"><table><thead><tr><th>ภารกิจ</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th></tr></thead><tbody>
