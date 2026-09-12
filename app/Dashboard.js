@@ -141,7 +141,7 @@ return (
 <div className="dash-grid">
 <div className="card">
 <div className="mk" style={{ marginBottom: 10 }}>สัดส่วนตามสถานะ</div>
-<div className="row" style={{ gap: 16, alignItems: "center", flexWrap: "nowrap" }}>
+<div className="dashboard-status-chart">
 <Donut segments={statusSeg} total={total} />
 <div style={{ flex: 1, minWidth: 0 }}>
 {statusSeg.map((s, i) => (
