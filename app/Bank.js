@@ -10,6 +10,7 @@ const [authors, setAuthors] = useState({});
 const [loading, setLoading] = useState(true);
 const [f, setF] = useState({ q: "", domain: [], task: [], spec: [], status: initialStatus, type: bankType, year: [] });
 const [advanced, setAdvanced] = useState(false);
+const [openDrop, setOpenDrop] = useState(null);
 const [loadError, setLoadError] = useState(false);
 const [editing, setEditing] = useState(null);
 const [previewing, setPreviewing] = useState(null);
@@ -60,6 +61,8 @@ const sortVal = (it, key) => {
 if (key === "id") return it.id;
 if (key === "stem") return (stems[it.current_version_id] || "").toLowerCase();
 if (key === "cat") return (domainTitle(it.nl_domain_code) + " " + (it.nl_subitem || "")).toLowerCase();
+if (key === "task") return taskName(it.physician_task).toLowerCase();
+if (key === "spec") return specName(it.specialty_id).toLowerCase();
 if (key === "author") return (authors[it.author_id] || "").toLowerCase();
 if (key === "status") return STATUS.indexOf(it.status);
 return "";
@@ -98,7 +101,21 @@ return (
 <button className="btn ghost" aria-expanded={advanced} aria-controls="bank-advanced" onClick={() => setAdvanced(!advanced)}>ตัวกรองเพิ่มเติม{advCount ? ` (${advCount})` : ""}</button>
 </div>
 {advanced && <div id="bank-advanced" className="bank-advanced">
-{[["domain", "หมวด", bp.domains.map(d => [d.code, d.title])], ["task", "ภารกิจ", bp.tasks.map(t => [t.code, t.name])], ["spec", "สาขา", bp.specs.map(x => [String(x.id), x.name_th])], ["year", "ปี พ.ศ.", years.map(y => [String(y), String(y)])]].map(([key, label, options]) => <div key={key} className="bank-adv-group"><span className="bank-adv-label">{label}</span><div className="bank-adv-chips">{options.map(([value, text]) => <button key={value} type="button" className={"status-filter" + (f[key].includes(value) ? " selected" : "")} aria-pressed={f[key].includes(value)} onClick={() => toggleMulti(key, value)}>{text}</button>)}</div></div>)}
+{[["domain", "หมวด", bp.domains.map(d => [d.code, d.title])], ["task", "ภารกิจ", bp.tasks.map(t => [t.code, t.name])], ["spec", "สาขา", bp.specs.map(x => [String(x.id), x.name_th])], ["year", "ปี พ.ศ.", years.map(y => [String(y), String(y)])]].map(([key, label, options]) => {
+const sel = f[key];
+const summary = sel.length === 0 ? "ทั้งหมด" : sel.length === 1 ? (options.find(([v]) => v === sel[0])?.[1] || "1 รายการ") : `เลือกแล้ว ${sel.length} รายการ`;
+return <div key={key} className="bank-drop">
+<label>{label}</label>
+<button type="button" className={"bank-drop-toggle" + (sel.length ? " has-sel" : "")} aria-haspopup="listbox" aria-expanded={openDrop === key} onClick={() => setOpenDrop(openDrop === key ? null : key)}><span className="bank-drop-text">{summary}</span><span className="bank-drop-caret" aria-hidden="true">▾</span></button>
+{openDrop === key && <>
+<div className="bank-drop-backdrop" onClick={() => setOpenDrop(null)} />
+<div className="bank-drop-panel" role="listbox" aria-label={label}>
+<div className="bank-drop-head"><span>{sel.length ? `เลือก ${sel.length}` : "เลือกได้หลายอัน"}</span>{sel.length > 0 && <button type="button" className="bank-drop-clear" onClick={() => setF(p => ({ ...p, [key]: [] }))}>ล้าง</button>}</div>
+{options.map(([value, text]) => <label key={value} className={"bank-drop-opt" + (sel.includes(value) ? " checked" : "")}><input type="checkbox" checked={sel.includes(value)} onChange={() => toggleMulti(key, value)} /><span>{text}</span></label>)}
+</div>
+</>}
+</div>;
+})}
 </div>}
 <div className="result-summary" role="status"><span>{loading ? "กำลังโหลดข้อสอบ…" : loadError ? "โหลดข้อมูลไม่สำเร็จ" : `พบ ${filtered.length} ข้อ จาก ${items.length} ข้อที่โหลด`}{!loading && items.length === 500 ? " · แสดง 500 ข้อล่าสุด" : ""}</span>{hasFilter && <button className="text-action" onClick={() => setF({ q: "", domain: [], task: [], spec: [], status: "", type: bankType, year: [] })}>ล้างตัวกรองทั้งหมด</button>}</div>
 {loadError ? <div className="empty card" role="alert"><p>โหลดคลังข้อสอบไม่สำเร็จ กรุณาลองอีกครั้ง</p><button className="btn ghost" onClick={load}>ลองใหม่</button></div> : <div className="tablewrap">
@@ -106,18 +123,22 @@ return (
 <thead><tr>
 <th aria-sort={aria("id")}><button type="button" className="th-sort" onClick={() => toggleSort("id")}>#{arrow("id")}</button></th>
 <th aria-sort={aria("stem")}><button type="button" className="th-sort" onClick={() => toggleSort("stem")}>ข้อสอบ{arrow("stem")}</button></th>
-<th aria-sort={aria("cat")}><button type="button" className="th-sort" onClick={() => toggleSort("cat")}>หมวด · ย่อย · ภารกิจ{arrow("cat")}</button></th>
+<th aria-sort={aria("cat")}><button type="button" className="th-sort" onClick={() => toggleSort("cat")}>หมวด{arrow("cat")}</button></th>
+<th aria-sort={aria("task")}><button type="button" className="th-sort" onClick={() => toggleSort("task")}>ภารกิจ{arrow("task")}</button></th>
+<th aria-sort={aria("spec")}><button type="button" className="th-sort" onClick={() => toggleSort("spec")}>สาขา{arrow("spec")}</button></th>
 <th aria-sort={aria("author")}><button type="button" className="th-sort" onClick={() => toggleSort("author")}>ผู้ออก{arrow("author")}</button></th>
 <th aria-sort={aria("status")}><button type="button" className="th-sort" onClick={() => toggleSort("status")}>สถานะ{arrow("status")}</button></th>
 <th><span className="sr-only">การดำเนินการ</span></th>
 </tr></thead>
 <tbody>
-{loading && <tr><td colSpan={6}><div className="empty">กำลังโหลด…</div></td></tr>}
-{!loading && sorted.length === 0 && <tr><td colSpan={6}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
+{loading && <tr><td colSpan={8}><div className="empty">กำลังโหลด…</div></td></tr>}
+{!loading && sorted.length === 0 && <tr><td colSpan={8}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
 {!loading && sorted.map(it => <tr key={it.id}>
 <td className="item-idcell">#{it.id}</td>
 <td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span><span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
-<td><div className="item-cat-main">{domainTitle(it.nl_domain_code) || "ไม่ระบุหมวด"}{it.nl_subitem ? <span className="item-cat-sub"> · {it.nl_subitem}</span> : ""}</div><div className="item-detail"><span className="cat-tag">ภารกิจ:</span> {taskName(it.physician_task) || "ไม่ระบุ"} <span className="cat-tag">· สาขา:</span> {specName(it.specialty_id) || "ไม่ระบุ"}</div></td>
+<td><div className="item-cat-main">{domainTitle(it.nl_domain_code) || "—"}</div>{it.nl_subitem ? <div className="item-detail">{it.nl_subitem}</div> : ""}</td>
+<td>{taskName(it.physician_task) || "—"}</td>
+<td>{specName(it.specialty_id) || "—"}</td>
 <td>{authors[it.author_id] || "—"}</td><td><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span></td><td><div className="item-actions"><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button>{canWrite && <button className="btn ghost sm" disabled={previewOnly} aria-label={"แก้ไขข้อสอบ " + it.id} onClick={() => setEditing(it)}>แก้ไข</button>}</div></td>
 </tr>)}
 </tbody></table></div>}
