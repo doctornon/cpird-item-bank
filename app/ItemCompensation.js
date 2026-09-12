@@ -15,7 +15,7 @@ export default function ItemCompensation({ sb, notify }) {
   const load = useCallback(async () => {
     setLoading(true);
     const [{ data: bi, error: e1 }, { data: es }] = await Promise.all([
-      sb.from("bank_items").select("id,author_id,status,use_count,type").neq("status", "personal").limit(5000),
+      sb.from("bank_items").select("id,author_id,status,use_count,type").neq("status", "personal").eq("is_sample", false).limit(5000),
       sb.from("exam_sets").select("id,name,kind").eq("kind", "mcq").order("id"),
     ]);
     if (e1) { setLoading(false); notify("โหลดข้อมูลไม่สำเร็จ: " + e1.message); return; }

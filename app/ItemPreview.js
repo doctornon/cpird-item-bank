@@ -125,6 +125,7 @@ return (
 <span style={{ fontWeight: 700, color: "var(--accent)" }}>#{item.id}</span>
 <span className={"pill " + item.type}>{item.type.toUpperCase()}</span>
 <span className={"pill " + item.status}>{STATUS_TH[item.status]}</span>
+{item.is_sample && <span className="pill draft" title="ข้อสอบตัวอย่างที่ ศรว. เผยแพร่ — ใช้จัดสอบจริงไม่ได้ แก้ไข/ทำซ้ำเพื่อสร้างข้อคู่ขนานได้">🧪 ตัวอย่าง ศรว.</span>}
 {item.exam_year && <span className="pill" style={{ background: "var(--accent-dark)" }}>ปี {item.exam_year}</span>}
 {usage.length > 0 ? <span className="pill approved">ใช้จริง {usage.length} ครั้ง</span> : item.use_count > 0 ? <span className="pill approved">ใช้แล้ว {item.use_count}</span> : <span className="muted">ยังไม่เคยใช้</span>}
 </div>
@@ -193,7 +194,7 @@ return (
 </>}
 </div>
 {canApprove && item.type === "mcq" && sets.length > 0 && <div className="row" style={{ gap: 6, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
-<span className="mk" style={{ margin: 0 }}>เพิ่มเข้าชุดข้อสอบ</span>
+<span className="mk" style={{ margin: 0 }}>เพิ่มเข้าชุดข้อสอบ{item.is_sample ? " (ข้อตัวอย่าง — เปิดสอบได้เฉพาะรอบ demo)" : ""}</span>
 <select value={chosenSet} onChange={(e) => setChosenSet(e.target.value)} disabled={busy}><option value="">— เลือกชุด —</option>{sets.map((s) => <option key={s.id} value={s.id}>{s.name}{s.active_state === "pending" ? " (pending)" : ""}</option>)}</select>
 <button className="btn ghost sm" disabled={busy || !chosenSet} onClick={addToSet}>＋ เพิ่มเข้าชุด</button>
 </div>}

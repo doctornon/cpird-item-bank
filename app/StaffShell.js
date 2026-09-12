@@ -16,7 +16,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
   window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);
  },[expanded]);
  const groups=[
-  ['ภาพรวม', [['dashboard','แดชบอร์ด']]],
+  ['ภาพรวม', [['dashboard','แดชบอร์ด'],['schedule','กำหนดการ & ประกาศ ศรว.']]],
   ['คลังข้อสอบ', [['bank','คลัง MCQ'],['meq','คลัง MEQ'],...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
   ['การสอบ', canApprove?[['sets','สร้างชุดข้อสอบ']]:[]],
   ['ระบบทดสอบ', [...(canApprove?[['assign','จัดรอบสอบ & ตั้งค่า'],['scores','ดูคะแนนสอบ']]:[]),['take','ทำข้อสอบ']]],

@@ -136,6 +136,7 @@ return (
 <button className="btn ghost sm" disabled={busy} onClick={requestClose}>ปิด</button>
 </div>
 {previewNotice && <div className="editor-confirm" role="note">{previewNotice}</div>}
+{item?.is_sample && <div className="editor-confirm" role="note">🧪 <strong>ข้อสอบตัวอย่าง ศรว.</strong> — ใช้จัดสอบจริงไม่ได้ (เปิดได้เฉพาะรอบ "ตัวอย่างห้องทดสอบ") · แก้ไขได้ และใช้ปุ่ม "ทำซ้ำ/ออกคู่ขนาน" เพื่อสร้างข้อจริงจากข้อนี้ · เฉลยเบื้องต้นยังไม่ผ่านการตรวจสอบจากกรรมการ</div>}
 <p className="editor-status" role="status">{loading ? "กำลังโหลดข้อสอบ…" : loadError ? "โหลดข้อสอบไม่สำเร็จ กรุณาปิดแล้วลองเปิดใหม่" : dirty ? "มีการแก้ไขที่ยังไม่ได้บันทึก" : "แก้ไขข้อมูลแล้วกดบันทึกเมื่อพร้อม"}</p>
 {confirmClose && <div className="editor-confirm" role="alert"><strong>ยังไม่ได้บันทึกการแก้ไข</strong><p>หากปิดตอนนี้ ข้อความที่แก้ไขจะหายไป</p><div className="row"><button ref={continueRef} className="btn" onClick={() => { setConfirmClose(false); dialogRef.current?.focus(); }}>กลับไปเขียนต่อ</button><button className="btn ghost" onClick={onClose}>ทิ้งการแก้ไขและปิด</button></div></div>}
 <fieldset disabled={busy || loading || loadError || confirmClose} className="editor-fields" onChangeCapture={() => setDirty(true)}>

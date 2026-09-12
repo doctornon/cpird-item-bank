@@ -143,7 +143,7 @@ return <div key={key} className="bank-drop">
 {!loading && sorted.length === 0 && <tr><td colSpan={10}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
 {!loading && sorted.map(it => <tr key={it.id}>
 <td className="item-idcell">#{it.id}</td>
-<td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span><span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
+<td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span>{it.is_sample && <span className="pill draft" title="ข้อสอบตัวอย่างที่ ศรว. เผยแพร่ — ใช้จัดสอบจริงไม่ได้">🧪 ตัวอย่าง ศรว.</span>}<span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
 <td><div className="item-cat-main">{domainTitle(it.nl_domain_code) || "—"}</div></td>
 <td>{it.nl_subitem || "—"}</td>
 <td>{taskName(it.physician_task) || "—"}</td>

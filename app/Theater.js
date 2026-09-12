@@ -109,7 +109,7 @@ return (
 {!item ? <div className="empty">ไม่มีข้อสอบในเงื่อนไขนี้</div> : (
 <>
 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-<div className="muted"><b style={{ color: "var(--accent)" }}>#{item.id}</b> · ข้อ {idx + 1} / {pool.length} · <span className={"pill " + item.type}>{item.type.toUpperCase()}</span> <span className={"pill " + item.status}>{STATUS_TH[item.status]}</span></div>
+<div className="muted"><b style={{ color: "var(--accent)" }}>#{item.id}</b> · ข้อ {idx + 1} / {pool.length} · <span className={"pill " + item.type}>{item.type.toUpperCase()}</span> <span className={"pill " + item.status}>{STATUS_TH[item.status]}</span>{item.is_sample && <span className="pill draft">🧪 ตัวอย่าง ศรว.</span>}</div>
 <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
 <button className="btn ghost sm" disabled={busy} onClick={() => setEditing(item)}>✎ แก้ไข</button>
 <button className="btn ghost sm" style={{ color: "var(--warn, #b26a00)" }} disabled={busy} onClick={openRevise}>↩ ส่งแก้</button>
