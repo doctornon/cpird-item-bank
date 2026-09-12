@@ -186,7 +186,7 @@ matrix={covTask} />
 <p className="muted" style={{ marginBottom: 12 }}>แสดงเฉพาะสาขาที่มีข้อสอบในคลัง — เลื่อนแนวนอนเพื่อดูทุกสาขา</p>
 {specsWithItems.length === 0 ? <div className="muted">ยังไม่มีข้อสอบที่ระบุสาขา</div> : (
 <div className="tablewrap" style={{ boxShadow: "none" }}>
-<Heat cols={{ axis: "สาขา", items: specsWithItems.map((s) => ({ label: (s.name_th || "").slice(0, 10), title: s.name_th })) }}
+<Heat cols={{ axis: "สาขา", items: specsWithItems.map((s) => ({ label: s.name_en || s.name_th, title: s.name_th })) }}
 rows={bp.domains.map((d) => ({ label: d.code, title: d.title }))}
 matrix={covSpec} />
 </div>

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { STATUS_TH } from "../lib/constants";
+import ItemEditor from "./ItemEditor";
 export default function Theater({ sb, bp, me, notify }) {
 const [pool, setPool] = useState([]);
 const [idx, setIdx] = useState(0);
@@ -12,6 +13,7 @@ const [names, setNames] = useState({});
 const [myScore, setMyScore] = useState("");
 const [myComment, setMyComment] = useState("");
 const [busy, setBusy] = useState(false);
+const [editing, setEditing] = useState(null);
 const loadPool = useCallback(async () => {
 let q = sb.from("bank_items").select("*").order("updated_at", { ascending: false }).limit(500);
 if (filter.status) q = q.eq("status", filter.status);
@@ -53,6 +55,27 @@ setBusy(false);
 if (error) return notify("ผิดพลาด: " + error.message);
 notify("บันทึกคะแนนแล้ว"); loadDetail();
 };
+const del = async () => {
+if (!item) return;
+if (!confirm("ลบข้อ #" + item.id + " ถาวร?\n(ถ้าอยู่ในชุดข้อสอบหรือเคยใช้สอบจริง จะลบไม่ได้)")) return;
+setBusy(true);
+const { error } = await sb.rpc("bank_delete_item", { _id: item.id });
+setBusy(false);
+if (error) return notify("ลบไม่ได้: " + error.message);
+notify("ลบข้อ #" + item.id + " แล้ว"); loadPool();
+};
+const sendRevise = async () => {
+if (!item) return;
+const note = prompt("ข้อความถึงผู้ออกข้อสอบ (สิ่งที่ต้องแก้ไข):", myComment || "");
+if (note === null) return;
+setBusy(true);
+const { error } = await sb.from("bank_items").update({ status: "draft", updated_at: new Date().toISOString() }).eq("id", item.id);
+if (error) { setBusy(false); return notify("ผิดพลาด: " + error.message); }
+if (item.author_id) await sb.from("item_notifications").insert({ recipient_id: item.author_id, item_id: item.id, kind: "revise", message: note || "ขอให้แก้ไขข้อสอบ", from_id: me });
+setBusy(false);
+notify(item.author_id ? "ส่งกลับให้ผู้ออกข้อสอบแก้ไข + แจ้งเตือนแล้ว" : "ส่งกลับเป็นร่างแล้ว (ข้อนี้ไม่มีผู้ออกข้อสอบระบุไว้ จึงไม่ได้แจ้งเตือน)");
+loadPool();
+};
 const avg = reviews.length ? (reviews.reduce((s, r) => s + (Number(r.ai_score) || 0), 0) / reviews.length) : null;
 const domainTitle = item ? (bp.domains.find((d) => d.code === item.nl_domain_code)?.title || item.nl_domain_code || "—") : "";
 const specName = item ? (bp.specs.find((s) => s.id === item.specialty_id)?.name_th || "—") : "";
@@ -82,7 +105,10 @@ return (
 <>
 <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
 <div className="muted"><b style={{ color: "var(--accent)" }}>#{item.id}</b> · ข้อ {idx + 1} / {pool.length} · <span className={"pill " + item.type}>{item.type.toUpperCase()}</span> <span className={"pill " + item.status}>{STATUS_TH[item.status]}</span></div>
-<div className="row" style={{ gap: 6 }}>
+<div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+<button className="btn ghost sm" disabled={busy} onClick={() => setEditing(item)}>✎ แก้ไข</button>
+<button className="btn ghost sm" style={{ color: "var(--warn, #b26a00)" }} disabled={busy} onClick={sendRevise}>↩ ส่งแก้</button>
+<button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy} onClick={del}>🗑 ลบ</button>
 <button className="btn ghost sm" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>‹ ก่อนหน้า</button>
 <button className="btn ghost sm" disabled={idx >= pool.length - 1} onClick={() => setIdx(idx + 1)}>ถัดไป ›</button>
 </div>
@@ -114,6 +140,7 @@ return (
 </>
 )}
 </div>
+{editing && <ItemEditor sb={sb} bp={bp} item={editing} canApprove notify={notify} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadPool(); }} />}
 </div>
 );
 }

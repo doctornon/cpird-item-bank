@@ -49,7 +49,7 @@ const [d, s, t, sp] = await Promise.all([
 sb.from("nl_domains").select("*").order("sort_order"),
 sb.from("nl_subitems").select("*").order("sort_order"),
 sb.from("physician_tasks").select("*").order("sort_order"),
-sb.from("medical_specialties").select("id,name_th,display_order").order("display_order"),
+sb.from("medical_specialties").select("id,name_th,name_en,display_order").order("display_order"),
 ]);
 setDomains(d.data || []); setSubitems(s.data || []);
 setTasks(t.data || []); setSpecs(sp.data || []);
