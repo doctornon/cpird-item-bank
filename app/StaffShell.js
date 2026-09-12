@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
-export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,onSignOut,children}) {
+export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,onLock,onSignOut,children}) {
  const [expanded,setExpanded]=useState(false);
  const [collapsed,setCollapsed]=useState(false);
  const [compact,setCompact]=useState(false);
@@ -27,6 +27,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
    <button ref={menu} className="btn ghost sm staff-menu" aria-label={compact?'เมนูหลัก':collapsed?'แสดงเมนูหลัก':'ย่อเมนูหลัก'} aria-expanded={compact?expanded:!collapsed} aria-controls="staff-navigation" onClick={()=>compact?setExpanded(!expanded):setCollapsed(!collapsed)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
    <span className="brand">คลังข้อสอบ CPIRD</span><span className="grow"/>
    <button className="btn ghost sm staff-take" onClick={()=>navigate('take')}>ทำข้อสอบ</button>
+   {onLock&&<button className="btn ghost sm staff-lock" title="ล็อกหน้าจอ (ป้องกันผู้อื่นเข้าถึง)" aria-label="ล็อกหน้าจอ" onClick={onLock}>🔒 ล็อก</button>}
    <span className="who">{profile?.full_name||profile?.email}<br/><span className="muted">{superAdmin?'ผู้ดูแลระบบ':roles.join(', ')}</span></span>
    <button className="btn ghost sm staff-signout" onClick={onSignOut}>ออก</button>
   </header>

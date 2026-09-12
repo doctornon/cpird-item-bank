@@ -17,6 +17,7 @@ const [session, setSession] = useState(undefined);
 const [profile, setProfile] = useState(null);
 const [roles, setRoles] = useState([]);
 const [superAdmin, setSuperAdmin] = useState(false);
+const [locked, setLocked] = useState(false);
 const [tab, setTab] = useState("dashboard");
 const [bankStatus, setBankStatus] = useState("");
 const [toast, setToast] = useState("");
@@ -25,6 +26,8 @@ const [subitems, setSubitems] = useState([]);
 const [tasks, setTasks] = useState([]);
 const [specs, setSpecs] = useState([]);
 const notify = useCallback((m) => { setToast(m); setTimeout(() => setToast(""), 3200); }, []);
+useEffect(() => { try { setLocked(localStorage.getItem("cpird_locked") === "1"); } catch {} }, []);
+const setLockedPersist = (v) => { setLocked(v); try { localStorage.setItem("cpird_locked", v ? "1" : "0"); } catch {} };
 useEffect(() => {
 sb.auth.getSession().then(({ data }) => setSession(data.session || null));
 const { data: sub } = sb.auth.onAuthStateChange((_e, s) => setSession(s));
@@ -60,6 +63,7 @@ if (!session) return <Login sb={sb} />;
 const bp = { domains, subitems, tasks, specs };
 const me = session.user.id;
 if (profile === null) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
+if (superAdmin && locked) return <LockScreen onUnlock={() => setLockedPersist(false)} />;
 // Non-staff users (students) get the exam-taking portal
 if (!hasStaff) {
 return (
@@ -72,7 +76,7 @@ return (
 if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
-<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} onSignOut={() => sb.auth.signOut()}>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "dashboard" && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
@@ -86,6 +90,19 @@ return (
 </StaffShell>
 {toast && <div className="toast">{toast}</div>}
 </>
+);
+}
+function LockScreen({ onUnlock }) {
+return (
+<div className="lockscreen">
+<img src="/lock-cover.png" alt="" className="lock-cover" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+<div className="lock-box">
+<div className="lock-emoji" aria-hidden="true">🔒</div>
+<h2 style={{ color: "var(--accent)", margin: "0 0 6px" }}>หน้าจอถูกล็อก</h2>
+<p className="muted" style={{ marginBottom: 20 }}>ระบบคลังข้อสอบถูกล็อกเพื่อความปลอดภัย ป้องกันผู้อื่นเข้าถึงคลังข้อสอบและชุดข้อสอบ</p>
+<button className="btn" onClick={onUnlock}>ปลดล็อกเพื่อเข้าใช้งาน</button>
+</div>
+</div>
 );
 }
 function Login({ sb }) {
