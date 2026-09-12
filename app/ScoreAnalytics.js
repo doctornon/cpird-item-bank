@@ -19,7 +19,7 @@ function agg(rows) {
   return { n: rows.length, students, avg, passed, passRate: rows.length ? (100 * passed) / rows.length : null };
 }
 
-export default function ScoreAnalytics({ sb, notify }) {
+export default function ScoreAnalytics({ sb, bp, notify }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("sets"); // sets | centers | people
@@ -27,6 +27,8 @@ export default function ScoreAnalytics({ sb, notify }) {
   const [answers, setAnswers] = useState(null);
   const [itemAnalysis, setItemAnalysis] = useState(null);
   const [q, setQ] = useState("");
+  const [ansFilter, setAnsFilter] = useState("all"); // all | correct | incorrect
+  const domainName = (code) => (bp?.domains || []).find((d) => d.code === code)?.title || code || "ไม่ระบุหมวด";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,25 +106,43 @@ export default function ScoreAnalytics({ sb, notify }) {
   // attempt answer detail (shared leaf)
   if (sel.attempt) {
     const r = sel.attempt;
+    const ans = answers || [];
+    const nCorrect = ans.filter((a) => a.is_correct).length;
+    const nIncorrect = ans.length - nCorrect;
+    const cats = {};
+    ans.forEach((a) => { const k = a.domain_code || "—"; const c = cats[k] || (cats[k] = { n: 0, correct: 0 }); c.n++; if (a.is_correct) c.correct++; });
+    const catRows = Object.entries(cats).map(([code, c]) => ({ code, name: code === "—" ? "ไม่ระบุหมวด" : domainName(code), ...c })).sort((x, y) => y.n - x.n);
+    const shown = ansFilter === "all" ? ans : ans.filter((a) => (ansFilter === "correct" ? a.is_correct : !a.is_correct));
     return (
-      <div>
-        <button className="btn ghost sm" onClick={() => { setSel((s) => ({ ...s, attempt: null })); setAnswers(null); }}>‹ กลับ</button>
+      <div className="sa-attempt">
+        <div className="row sa-noprint" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <button className="btn ghost sm" onClick={() => { setSel((s) => ({ ...s, attempt: null })); setAnswers(null); setAnsFilter("all"); }}>‹ กลับ</button>
+          <button className="btn ghost sm" onClick={() => window.print()}>🖨 พิมพ์{ansFilter === "correct" ? " (เฉพาะถูก)" : ansFilter === "incorrect" ? " (เฉพาะผิด)" : ""}</button>
+        </div>
         <div className="workspace-heading"><div><h2>{r.student_name || "ผู้สอบ"} {r.student_code ? "· " + r.student_code : ""}</h2>
           <p>{r.assignment_title} · {r.set_name} · ครั้งที่ {r.attempt_no} · {fdate(r.submitted_at)}</p></div>
           <div style={{ textAlign: "right" }}><div className="pv-big" style={{ color: r.passed ? "var(--good)" : "var(--stop)" }}>{pct(r.percent)}</div>
             <div className="muted">{r.score}/{r.max_score} · {r.passed ? "ผ่าน" : "ไม่ผ่าน"} (เกณฑ์ {r.pass_mark}%)</div></div>
         </div>
-        {answers == null ? <p className="muted">กำลังโหลด…</p> : (
-          <div className="tablewrap"><table><thead><tr><th>#</th><th>โจทย์</th><th>ตอบ</th><th>เฉลย</th><th>ผล</th><th>คะแนน</th></tr></thead>
-            <tbody>{answers.length === 0 ? <tr><td colSpan={6}><div className="empty">ไม่มีคำตอบ</div></td></tr> :
-              answers.map((a, i) => <tr key={a.item_id + "_" + i}><td>{i + 1}</td>
-                <td style={{ maxWidth: 420 }}>{(a.stem || "").slice(0, 160)}</td>
+        {answers == null ? <p className="muted">กำลังโหลด…</p> : <>
+          {catRows.length > 0 && <><h3 className="delivery-subheading">ถูก/ผิด ตามหมวด</h3>
+            <div className="tablewrap"><table><thead><tr><th>หมวด</th><th>ถูก</th><th>ทั้งหมด</th><th>ร้อยละ</th></tr></thead>
+              <tbody>{catRows.map((c) => <tr key={c.code}><td>{c.name}</td><td>{c.correct}</td><td>{c.n}</td><td><span className={"pill " + (c.correct / c.n >= 0.5 ? "approved" : "retired")}>{pct(100 * c.correct / c.n)}</span></td></tr>)}</tbody></table></div></>}
+          <div className="bank-status sa-noprint" style={{ marginTop: 12 }}>
+            {[["all", "ทุกข้อ " + ans.length], ["correct", "ถูก " + nCorrect], ["incorrect", "ผิด " + nIncorrect]].map(([v, l]) =>
+              <button key={v} className={"status-filter" + (ansFilter === v ? " selected" : "")} aria-pressed={ansFilter === v} onClick={() => setAnsFilter(v)}>{l}</button>)}
+          </div>
+          <div className="tablewrap"><table><thead><tr><th>#</th><th>หมวด</th><th>โจทย์</th><th>ตอบ</th><th>เฉลย</th><th>ผล</th><th>คะแนน</th></tr></thead>
+            <tbody>{shown.length === 0 ? <tr><td colSpan={7}><div className="empty">ไม่มีข้อในเงื่อนไขนี้</div></td></tr> :
+              shown.map((a, i) => <tr key={a.item_id + "_" + i}><td>{i + 1}</td>
+                <td>{a.domain_code || "—"}</td>
+                <td style={{ maxWidth: 420 }}>{(a.stem || "").slice(0, 200)}</td>
                 <td>{a.selected_label || (a.essay_text ? "(อัตนัย)" : "—")}</td>
                 <td>{a.correct_label || "—"}</td>
                 <td>{a.is_correct ? <span className="pill approved">ถูก</span> : <span className="pill retired">ผิด</span>}</td>
                 <td>{a.points_awarded ?? "—"}</td></tr>)}
             </tbody></table></div>
-        )}
+        </>}
       </div>
     );
   }

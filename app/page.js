@@ -88,7 +88,7 @@ return (
 {canApprove && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
-{tab === "scores" && canApprove && <ScoreAnalytics sb={sb} notify={notify} />}
+{tab === "scores" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} />}
 {tab === "comp" && canApprove && <ItemCompensation sb={sb} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}
