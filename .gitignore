@@ -1,0 +1,16 @@
+node_modules/
+.next/
+.vercel/
+*.log
+.env*
+!.env.example
+/work/
+/.impeccable/
+/app/design-preview/
+/templates/
+/db/
+/docs/
+*.pdf
+*.zip
+.DS_Store
+.vercel

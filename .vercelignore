@@ -1,0 +1,13 @@
+.git
+node_modules
+.next
+work
+.impeccable
+app/design-preview
+templates
+db
+docs
+supabase
+*.pdf
+*.zip
+.env*
