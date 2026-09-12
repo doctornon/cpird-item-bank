@@ -8,8 +8,8 @@ import Theater from "./Theater";
 import ExamSets from "./ExamSets";
 import Import from "./Import";
 import RolesAdmin from "./RolesAdmin";
-import Assign from "./Assign";
-import ExamPortal from "./ExamPortal";
+import DeliveryPortal from "./DeliveryPortal";
+import DeliveryManager from "./DeliveryManager";
 export default function Page() {
 const sb = getSupabase();
 const [session, setSession] = useState(undefined);
@@ -63,16 +63,18 @@ if (profile === null) return <div className="login"><div className="muted">ก�
 if (!hasStaff) {
 return (
 <>
-<ExamPortal sb={sb} profile={profile} notify={notify} onSignOut={() => sb.auth.signOut()} />
+<DeliveryPortal sb={sb} profile={profile} onSignOut={() => sb.auth.signOut()} />
 {toast && <div className="toast">{toast}</div>}
 </>
 );
 }
+if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
 <div className="topbar"><div className="wrap in">
 <span className="brand">คลังข้อสอบ CPIRD</span>
 <div className="tabs">
+<button className="tab" onClick={() => setTab("take")}>โหมดทำข้อสอบ</button>
 <button className={"tab" + (tab === "dashboard" ? " active" : "")} onClick={() => setTab("dashboard")}>แดชบอร์ด</button>
 <button className={"tab" + (tab === "bank" ? " active" : "")} onClick={() => setTab("bank")}>คลัง MCQ</button>
 <button className={"tab" + (tab === "meq" ? " active" : "")} onClick={() => setTab("meq")}>คลัง MEQ</button>
@@ -94,7 +96,7 @@ return (
 {tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "meq" && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "sets" && canApprove && <ExamSets sb={sb} bp={bp} me={me} notify={notify} />}
-{tab === "assign" && canApprove && <Assign sb={sb} bp={bp} me={me} notify={notify} />}
+{tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}
