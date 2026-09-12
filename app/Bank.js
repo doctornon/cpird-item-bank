@@ -60,7 +60,8 @@ return true;
 const sortVal = (it, key) => {
 if (key === "id") return it.id;
 if (key === "stem") return (stems[it.current_version_id] || "").toLowerCase();
-if (key === "cat") return (domainTitle(it.nl_domain_code) + " " + (it.nl_subitem || "")).toLowerCase();
+if (key === "cat") return domainTitle(it.nl_domain_code).toLowerCase();
+if (key === "sub") return (it.nl_subitem || "").toLowerCase();
 if (key === "task") return taskName(it.physician_task).toLowerCase();
 if (key === "spec") return specName(it.specialty_id).toLowerCase();
 if (key === "author") return (authors[it.author_id] || "").toLowerCase();
@@ -123,7 +124,8 @@ return <div key={key} className="bank-drop">
 <thead><tr>
 <th aria-sort={aria("id")}><button type="button" className="th-sort" onClick={() => toggleSort("id")}>#{arrow("id")}</button></th>
 <th aria-sort={aria("stem")}><button type="button" className="th-sort" onClick={() => toggleSort("stem")}>ข้อสอบ{arrow("stem")}</button></th>
-<th aria-sort={aria("cat")}><button type="button" className="th-sort" onClick={() => toggleSort("cat")}>หมวด{arrow("cat")}</button></th>
+<th aria-sort={aria("cat")}><button type="button" className="th-sort" onClick={() => toggleSort("cat")}>หมวดหลัก{arrow("cat")}</button></th>
+<th aria-sort={aria("sub")}><button type="button" className="th-sort" onClick={() => toggleSort("sub")}>หมวดย่อย{arrow("sub")}</button></th>
 <th aria-sort={aria("task")}><button type="button" className="th-sort" onClick={() => toggleSort("task")}>ภารกิจ{arrow("task")}</button></th>
 <th aria-sort={aria("spec")}><button type="button" className="th-sort" onClick={() => toggleSort("spec")}>สาขา{arrow("spec")}</button></th>
 <th aria-sort={aria("author")}><button type="button" className="th-sort" onClick={() => toggleSort("author")}>ผู้ออก{arrow("author")}</button></th>
@@ -131,12 +133,13 @@ return <div key={key} className="bank-drop">
 <th><span className="sr-only">การดำเนินการ</span></th>
 </tr></thead>
 <tbody>
-{loading && <tr><td colSpan={8}><div className="empty">กำลังโหลด…</div></td></tr>}
-{!loading && sorted.length === 0 && <tr><td colSpan={8}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
+{loading && <tr><td colSpan={9}><div className="empty">กำลังโหลด…</div></td></tr>}
+{!loading && sorted.length === 0 && <tr><td colSpan={9}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
 {!loading && sorted.map(it => <tr key={it.id}>
 <td className="item-idcell">#{it.id}</td>
 <td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span><span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
-<td><div className="item-cat-main">{domainTitle(it.nl_domain_code) || "—"}</div>{it.nl_subitem ? <div className="item-detail">{it.nl_subitem}</div> : ""}</td>
+<td><div className="item-cat-main">{domainTitle(it.nl_domain_code) || "—"}</div></td>
+<td>{it.nl_subitem || "—"}</td>
 <td>{taskName(it.physician_task) || "—"}</td>
 <td>{specName(it.specialty_id) || "—"}</td>
 <td>{authors[it.author_id] || "—"}</td><td><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span></td><td><div className="item-actions"><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button>{canWrite && <button className="btn ghost sm" disabled={previewOnly} aria-label={"แก้ไขข้อสอบ " + it.id} onClick={() => setEditing(it)}>แก้ไข</button>}</div></td>
