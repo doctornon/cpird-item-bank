@@ -69,6 +69,9 @@ export default function ExamSets({sb,bp,me,notify}){
   await query(sb.from('exam_set_items').insert(ranked.map((p,i)=>({exam_set_id:sel.id,item_id:p.id,position:base+i+1,points:1}))));
   notify('เติม '+ranked.length+' ข้ออัตโนมัติ'+(ranked.length<need?(' — ยังขาดอีก '+(need-ranked.length)+' ข้อ ควรออกใหม่'):''));
  });
+ const setG1=spec?items.filter(x=>x.detail&&x.detail.nl_group===1).length:0;
+ const setCat1=spec?items.filter(x=>x.detail&&!x.detail.icd_system&&x.detail.nl_domain_code!=='X').length:0;
+ const magicFillG1=(need)=>mutate(async()=>{const have=new Set(items.map(x=>String(x.item_id)));const cands=pool.filter(p=>p.status==='approved'&&p.nl_group===1&&!have.has(String(p.id)));if(!cands.length)throw Error('ไม่มีข้อฉุกเฉินในคลัง — แนะนำให้ออกข้อใหม่');const ranked=[...cands].sort((a,b)=>qscore(b)-qscore(a)).slice(0,need);const base=items.length?Math.max(...items.map(x=>x.position)):0;await query(sb.from('exam_set_items').insert(ranked.map((p,i)=>({exam_set_id:sel.id,item_id:p.id,position:base+i+1,points:1}))));notify('เติมข้อฉุกเฉิน '+ranked.length+' ข้ออัตโนมัติ');});
  const props2569=spec&&sel.spec_version==='2569'?TOS['2569'].taskProps:null;
  const taskGap=props2569?[['dx','วินิจฉัย'],['labs','ตรวจทางห้องปฏิบัติการ'],['tx','รักษา'],['patho','พยาธิกำเนิด'],['prognosis','พยากรณ์โรค']].map(([code,label])=>{
   const target=Math.round(spec.group1.target*props2569.group1[code]+spec.diseaseTotal*props2569.group23[code]);
@@ -101,6 +104,11 @@ export default function ExamSets({sb,bp,me,notify}){
  </div>
  {spec&&<>
  <p className="set-note">{spec.note} · ฐาน {spec.total} ข้อ → ปรับเป็น {spec.N} ข้อ (หมวด1 ทั่วไป {spec.category1.target} · ฉุกเฉิน {spec.group1.target} · โรคตามระบบ {spec.diseaseTotal})</p>
+ <div className="tablewrap"><table><thead><tr><th>ภาพรวม</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th><th>เติมอัตโนมัติ (magic)</th></tr></thead><tbody>
+ {(()=>{const d=setCat1-spec.category1.target;return <tr><td>หมวด1 ทั่วไป (ส่งเสริม/จริยธรรม/นิติเวช)</td><td>{spec.category1.target}</td><td>{setCat1}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td/></tr>;})()}
+ {(()=>{const d=setG1-spec.group1.target;const avail=pool.filter(p=>p.status==='approved'&&p.nl_group===1&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr><td>กลุ่มฉุกเฉิน (group 1)</td><td>{spec.group1.target}</td><td>{setG1}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFillG1(-d)}>✨ เติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})()}
+ </tbody></table></div>
+ <div className="mk" style={{margin:'12px 0 6px'}}>โรคตามระบบ (กลุ่ม 2+3)</div>
  <div className="tablewrap"><table><thead><tr><th>ระบบโรค (ICD)</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th><th>เติมอัตโนมัติ (magic)</th></tr></thead><tbody>
  {spec.systems.filter(s=>s.target>0||setIcd[s.code]).map(s=>{const a=setIcd[s.code]||0;const d=a-s.target;const avail=pool.filter(p=>p.status==='approved'&&p.icd_system===s.code&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr key={s.code}><td title={s.th}>{s.roman}. {s.th}</td><td>{s.target}</td><td>{a}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFill(s.code,-d)}>✨ เติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})}
  </tbody></table></div>
