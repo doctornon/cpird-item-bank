@@ -20,7 +20,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
   ['คลังข้อสอบ', [['bank','คลัง MCQ'],['meq','คลัง MEQ'],...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
   ['การสอบ', canApprove?[['sets','สร้างชุดข้อสอบ']]:[]],
   ['ระบบทดสอบ', [...(canApprove?[['assign','จัดรอบสอบ & ตั้งค่า'],['scores','ดูคะแนนสอบ']]:[]),['take','ทำข้อสอบ']]],
-  ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(superAdmin?[['roles','จัดการสิทธิ์']]:[])]]
+  ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(canApprove?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['roles','จัดการสิทธิ์']]:[])]]
  ];
  const navigate=key=>{onNavigate(key);setExpanded(false);};
  return <div className={'staff-shell'+(collapsed?' nav-collapsed':'')}>

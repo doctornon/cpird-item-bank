@@ -9,6 +9,7 @@ import MeqBank from "./MeqBank";
 import Theater from "./Theater";
 import ExamSets from "./ExamSets";
 import ScoreAnalytics from "./ScoreAnalytics";
+import ItemCompensation from "./ItemCompensation";
 import Import from "./Import";
 import RolesAdmin from "./RolesAdmin";
 import DeliveryPortal from "./DeliveryPortal";
@@ -88,6 +89,7 @@ return (
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "scores" && canApprove && <ScoreAnalytics sb={sb} notify={notify} />}
+{tab === "comp" && canApprove && <ItemCompensation sb={sb} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}
 </div>

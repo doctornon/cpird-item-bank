@@ -14,6 +14,11 @@ const [myScore, setMyScore] = useState("");
 const [myComment, setMyComment] = useState("");
 const [busy, setBusy] = useState(false);
 const [editing, setEditing] = useState(null);
+const [staff, setStaff] = useState([]);
+const [reviseOpen, setReviseOpen] = useState(false);
+const [reviseTo, setReviseTo] = useState("");
+const [reviseNote, setReviseNote] = useState("");
+useEffect(() => { sb.rpc("exam_staff_list").then(({ data }) => setStaff(data || [])); }, [sb]);
 const loadPool = useCallback(async () => {
 let q = sb.from("bank_items").select("*").neq("status", "personal").order("updated_at", { ascending: false }).limit(500);
 if (filter.status) q = q.eq("status", filter.status);
@@ -64,16 +69,15 @@ setBusy(false);
 if (error) return notify("ลบไม่ได้: " + error.message);
 notify("ลบข้อ #" + item.id + " แล้ว"); loadPool();
 };
+const openRevise = () => { if (!item) return; setReviseTo(item.author_id || ""); setReviseNote(myComment || ""); setReviseOpen(true); };
 const sendRevise = async () => {
 if (!item) return;
-const note = prompt("ข้อความถึงผู้ออกข้อสอบ (สิ่งที่ต้องแก้ไข):", myComment || "");
-if (note === null) return;
 setBusy(true);
 const { error } = await sb.from("bank_items").update({ status: "draft", updated_at: new Date().toISOString() }).eq("id", item.id);
 if (error) { setBusy(false); return notify("ผิดพลาด: " + error.message); }
-if (item.author_id) await sb.from("item_notifications").insert({ recipient_id: item.author_id, item_id: item.id, kind: "revise", message: note || "ขอให้แก้ไขข้อสอบ", from_id: me });
-setBusy(false);
-notify(item.author_id ? "ส่งกลับให้ผู้ออกข้อสอบแก้ไข + แจ้งเตือนแล้ว" : "ส่งกลับเป็นร่างแล้ว (ข้อนี้ไม่มีผู้ออกข้อสอบระบุไว้ จึงไม่ได้แจ้งเตือน)");
+if (reviseTo) await sb.from("item_notifications").insert({ recipient_id: reviseTo, item_id: item.id, kind: "revise", message: reviseNote || "ขอให้แก้ไขข้อสอบ", from_id: me });
+setBusy(false); setReviseOpen(false);
+notify(reviseTo ? "ส่งกลับให้แก้ไข + แจ้งเตือนผู้รับแล้ว" : "ส่งกลับเป็นร่างแล้ว (ยังไม่เลือกผู้รับ จึงไม่ได้แจ้งเตือน)");
 loadPool();
 };
 const avg = reviews.length ? (reviews.reduce((s, r) => s + (Number(r.ai_score) || 0), 0) / reviews.length) : null;
@@ -107,7 +111,7 @@ return (
 <div className="muted"><b style={{ color: "var(--accent)" }}>#{item.id}</b> · ข้อ {idx + 1} / {pool.length} · <span className={"pill " + item.type}>{item.type.toUpperCase()}</span> <span className={"pill " + item.status}>{STATUS_TH[item.status]}</span></div>
 <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
 <button className="btn ghost sm" disabled={busy} onClick={() => setEditing(item)}>✎ แก้ไข</button>
-<button className="btn ghost sm" style={{ color: "var(--warn, #b26a00)" }} disabled={busy} onClick={sendRevise}>↩ ส่งแก้</button>
+<button className="btn ghost sm" style={{ color: "var(--warn, #b26a00)" }} disabled={busy} onClick={openRevise}>↩ ส่งแก้</button>
 <button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy} onClick={del}>🗑 ลบ</button>
 <button className="btn ghost sm" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>‹ ก่อนหน้า</button>
 <button className="btn ghost sm" disabled={idx >= pool.length - 1} onClick={() => setIdx(idx + 1)}>ถัดไป ›</button>
@@ -141,6 +145,12 @@ return (
 )}
 </div>
 {editing && <ItemEditor sb={sb} bp={bp} item={editing} canApprove notify={notify} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); loadPool(); }} />}
+{reviseOpen && item && <div className="overlay" onClick={(e) => e.target === e.currentTarget && setReviseOpen(false)}><div className="modal">
+<div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}><h3>ส่งข้อ #{item.id} ให้แก้ไข</h3><button className="btn ghost sm" onClick={() => setReviseOpen(false)}>ปิด</button></div>
+<div className="field"><label>ส่งให้</label><select value={reviseTo} onChange={(e) => setReviseTo(e.target.value)}><option value="">— ไม่แจ้งเตือน (แค่ส่งกลับเป็นร่าง) —</option>{staff.map((u) => <option key={u.id} value={u.id}>{u.name}{u.id === item.author_id ? " (ผู้ออกข้อสอบ)" : ""}</option>)}</select></div>
+<div className="field" style={{ marginTop: 8 }}><label>ข้อความถึงผู้รับ</label><textarea rows={4} value={reviseNote} onChange={(e) => setReviseNote(e.target.value)} placeholder="สิ่งที่ต้องแก้ไข" /></div>
+<div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 12 }}><button className="btn ghost" onClick={() => setReviseOpen(false)} disabled={busy}>ยกเลิก</button><button className="btn" onClick={sendRevise} disabled={busy}>↩ ส่งแก้</button></div>
+</div></div>}
 </div>
 );
 }
