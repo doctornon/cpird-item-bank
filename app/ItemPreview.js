@@ -10,6 +10,8 @@ const [review, setReview] = useState(null);
 const [usage, setUsage] = useState([]);
 const [usageLog, setUsageLog] = useState([]);
 const [busy, setBusy] = useState(false);
+const [sets, setSets] = useState([]);
+const [chosenSet, setChosenSet] = useState("");
 useEffect(() => {
 (async () => {
 if (item.current_version_id) {
@@ -30,6 +32,25 @@ const { data: ul } = await sb.from("bank_item_usage_log").select("*").eq("item_i
 setUsageLog(ul || []);
 })();
 }, [item, sb]);
+useEffect(() => {
+if (!canApprove || item.type !== "mcq") return;
+sb.from("exam_sets").select("id,name,active_state").eq("kind", "mcq").neq("active_state", "inactive").order("id").then(({ data }) => setSets(data || []));
+}, [sb, canApprove, item.type]);
+const addToSet = async () => {
+if (!chosenSet) return;
+setBusy(true);
+try {
+const { data: ex } = await sb.from("exam_set_items").select("id").eq("exam_set_id", chosenSet).eq("item_id", item.id).maybeSingle();
+if (ex) { notify && notify("ข้อนี้อยู่ในชุดนี้แล้ว"); return; }
+const { data: mx } = await sb.from("exam_set_items").select("position").eq("exam_set_id", chosenSet).order("position", { ascending: false }).limit(1);
+const pos = ((mx && mx[0]?.position) || 0) + 1;
+const { error } = await sb.from("exam_set_items").insert({ exam_set_id: Number(chosenSet), item_id: item.id, position: pos, points: 1 });
+if (error) throw error;
+notify && notify("เพิ่มข้อ #" + item.id + " เข้าชุด “" + (sets.find((s) => String(s.id) === String(chosenSet))?.name || "") + "” แล้ว");
+setChosenSet("");
+} catch (e) { notify && notify("เพิ่มเข้าชุดไม่สำเร็จ: " + (e.message || e)); }
+finally { setBusy(false); }
+};
 const domainIdx = bp.domains.findIndex((d) => d.code === item.nl_domain_code);
 const domain = domainIdx >= 0 ? bp.domains[domainIdx] : null;
 const domainTitle = domain?.title || item.nl_domain_code || "—";
@@ -168,6 +189,11 @@ return (
 <tbody>{usageLog.map((u) => <tr key={u.id}><td>{fdate(u.used_on)}</td><td>{u.note || "—"}</td><td>{u.source || "—"}</td><td>{u.n_examinees ?? "—"}</td></tr>)}</tbody></table>
 </>}
 </div>
+{canApprove && item.type === "mcq" && sets.length > 0 && <div className="row" style={{ gap: 6, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+<span className="mk" style={{ margin: 0 }}>เพิ่มเข้าชุดข้อสอบ</span>
+<select value={chosenSet} onChange={(e) => setChosenSet(e.target.value)} disabled={busy}><option value="">— เลือกชุด —</option>{sets.map((s) => <option key={s.id} value={s.id}>{s.name}{s.active_state === "pending" ? " (pending)" : ""}</option>)}</select>
+<button className="btn ghost sm" disabled={busy || !chosenSet} onClick={addToSet}>＋ เพิ่มเข้าชุด</button>
+</div>}
 <div className="row" style={{ justifyContent: "space-between", marginTop: 14, alignItems: "center" }}>
 <div className="row" style={{ gap: 6 }}>
 <button className="btn ghost sm" onClick={copy}>📋 คัดลอกไป Word</button>

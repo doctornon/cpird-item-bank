@@ -10,7 +10,7 @@ export default function DeliveryManager({sb}){
  const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
  const rpc=useCallback(async(action,payload={})=>{const {data,error}=await sb.rpc('delivery_manage',{action,payload});if(error)throw Error(error.message);return data;},[sb]);
  const load=useCallback(async()=>{setLoading(true);try{
-  const [list,mcq,meq,c]=await Promise.all([rpc('list'),sb.from('exam_sets').select('id,name,status').eq('kind','mcq').eq('status','ready').order('updated_at',{ascending:false}),sb.from('exam_sets').select('id,name,status').eq('kind','meq').eq('status','ready').order('updated_at',{ascending:false}),sb.from('medical_centers').select('id,name_th,short_name').eq('is_active',true).order('display_order')]);
+  const [list,mcq,meq,c]=await Promise.all([rpc('list'),sb.from('exam_sets').select('id,name,active_state').eq('kind','mcq').eq('active_state','active').order('updated_at',{ascending:false}),sb.from('exam_sets').select('id,name,active_state').eq('kind','meq').eq('active_state','active').order('updated_at',{ascending:false}),sb.from('medical_centers').select('id,name_th,short_name').eq('is_active',true).order('display_order')]);
   for(const r of [mcq,meq,c])if(r.error)throw Error(r.error.message);
   setRows(list);setSources({mcq:mcq.data||[],meq:(meq.data||[]).map(s=>({...s,id:`set:${s.id}`}))});setCenters((c.data||[]).map(x=>({id:x.id,name:x.short_name||x.name_th})));
  }catch(e){setError(e.message);}finally{setLoading(false);}},[sb,rpc]);
@@ -51,8 +51,8 @@ export default function DeliveryManager({sb}){
    <div hidden={ftab!=='exam'}>
     <label>ชื่อรอบสอบ<input maxLength={300} value={form.title} onChange={e=>set('title',e.target.value)}/></label>
     <div className="grid2"><label>รูปแบบ<select value={form.kind} onChange={e=>setForm(f=>({...f,kind:e.target.value,source_id:''}))}><option value="mcq">MCQ · เลือกคำตอบ</option><option value="meq">MEQ · เปิดทีละตอน</option></select></label>
-     <label>{form.kind==='mcq'?'ชุด MCQ':'ชุด MEQ'}<select value={form.source_id} onChange={e=>set('source_id',e.target.value)}><option value="">เลือกจากคลัง</option>{sources[form.kind].map(s=><option key={s.id} value={s.id}>{s.name||s.title}{s.status?` (${s.status==='ready'?'พร้อมใช้':'ร่าง'})`:''}</option>)}</select></label></div>
-    {!sources[form.kind].length&&<p className="muted">คลังยังว่าง กรุณาสร้าง{form.kind==='mcq'?'ชุด MCQ':'ชุด MEQ'}ที่พร้อมใช้ก่อน</p>}
+     <label>{form.kind==='mcq'?'ชุด MCQ':'ชุด MEQ'}<select value={form.source_id} onChange={e=>set('source_id',e.target.value)}><option value="">เลือกจากคลัง</option>{sources[form.kind].map(s=><option key={s.id} value={s.id}>{s.name||s.title}</option>)}</select></label></div>
+    {!sources[form.kind].length&&<p className="muted">ยังไม่มี{form.kind==='mcq'?'ชุด MCQ':'ชุด MEQ'}ที่ “ใช้งาน” — ไปที่เมนู “สร้างชุดข้อสอบ” แล้วตั้งสถานะชุดเป็น “ใช้งาน”</p>}
     <label>คำชี้แจงก่อนสอบ<textarea rows={4} value={form.instructions} onChange={e=>set('instructions',e.target.value)}/></label>
     {form.kind==='mcq'&&<label>สุ่มจำนวนข้อจากชุด (question pool)<input type="number" min="1" step="1" value={form.pool_draw} onChange={e=>set('pool_draw',e.target.value)} placeholder="เว้นว่าง = ใช้ทุกข้อในชุด · ใส่ N = สุ่ม N ข้อ/คน"/></label>}
    </div>
