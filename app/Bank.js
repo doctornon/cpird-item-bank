@@ -36,6 +36,7 @@ setLoading(false);
 useEffect(() => { load(); }, [load]);
 const specName = (id) => bp.specs.find((s) => s.id === id)?.name_th || "";
 const taskName = (c) => bp.tasks.find((t) => t.code === c)?.name || c || "";
+const domainTitle = (c) => bp.domains.find((d) => d.code === c)?.title || c || "";
 const years = [...new Set(items.map((i) => i.exam_year).filter(Boolean))].sort((a, b) => b - a);
 const toggleMulti = (key, value) => setF((prev) => {
 const cur = prev[key] || [];
@@ -58,7 +59,7 @@ return true;
 const sortVal = (it, key) => {
 if (key === "id") return it.id;
 if (key === "stem") return (stems[it.current_version_id] || "").toLowerCase();
-if (key === "cat") return ((it.nl_domain_code || "") + " " + (it.nl_subitem || "")).toLowerCase();
+if (key === "cat") return (domainTitle(it.nl_domain_code) + " " + (it.nl_subitem || "")).toLowerCase();
 if (key === "author") return (authors[it.author_id] || "").toLowerCase();
 if (key === "status") return STATUS.indexOf(it.status);
 return "";
@@ -105,7 +106,7 @@ return (
 <thead><tr>
 <th aria-sort={aria("id")}><button type="button" className="th-sort" onClick={() => toggleSort("id")}>#{arrow("id")}</button></th>
 <th aria-sort={aria("stem")}><button type="button" className="th-sort" onClick={() => toggleSort("stem")}>ข้อสอบ{arrow("stem")}</button></th>
-<th aria-sort={aria("cat")}><button type="button" className="th-sort" onClick={() => toggleSort("cat")}>หมวด / สาขา{arrow("cat")}</button></th>
+<th aria-sort={aria("cat")}><button type="button" className="th-sort" onClick={() => toggleSort("cat")}>หมวด · ย่อย · ภารกิจ{arrow("cat")}</button></th>
 <th aria-sort={aria("author")}><button type="button" className="th-sort" onClick={() => toggleSort("author")}>ผู้ออก{arrow("author")}</button></th>
 <th aria-sort={aria("status")}><button type="button" className="th-sort" onClick={() => toggleSort("status")}>สถานะ{arrow("status")}</button></th>
 <th><span className="sr-only">การดำเนินการ</span></th>
@@ -116,8 +117,8 @@ return (
 {!loading && sorted.map(it => <tr key={it.id}>
 <td className="item-idcell">#{it.id}</td>
 <td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span><span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
-<td><div>{it.nl_domain_code || "ไม่ระบุหมวด"}{it.nl_subitem ? " · " + it.nl_subitem : ""}</div><div className="item-detail">{specName(it.specialty_id) || "ไม่ระบุสาขา"} · {taskName(it.physician_task) || "ไม่ระบุภารกิจ"}</div></td>
-<td>{authors[it.author_id] || "—"}</td><td><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span></td><td><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button></td>
+<td><div className="item-cat-main">{domainTitle(it.nl_domain_code) || "ไม่ระบุหมวด"}{it.nl_subitem ? <span className="item-cat-sub"> · {it.nl_subitem}</span> : ""}</div><div className="item-detail"><span className="cat-tag">ภารกิจ:</span> {taskName(it.physician_task) || "ไม่ระบุ"} <span className="cat-tag">· สาขา:</span> {specName(it.specialty_id) || "ไม่ระบุ"}</div></td>
+<td>{authors[it.author_id] || "—"}</td><td><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span></td><td><div className="item-actions"><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button>{canWrite && <button className="btn ghost sm" disabled={previewOnly} aria-label={"แก้ไขข้อสอบ " + it.id} onClick={() => setEditing(it)}>แก้ไข</button>}</div></td>
 </tr>)}
 </tbody></table></div>}
 {previewing && <ItemPreview sb={sb} bp={bp} item={previewing} authorName={authors[previewing.author_id]}
