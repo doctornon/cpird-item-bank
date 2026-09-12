@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { STATUS_TH } from "../lib/constants";
+import { StemImages, OptImage } from "./QImages";
 const fdate = (iso) => iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "—";
 export default function ItemPreview({ sb, bp, item, authorName, canWrite, canApprove, onEdit, onClose, onChanged, notify }) {
 const [ver, setVer] = useState(null);
@@ -146,6 +147,7 @@ return (
 <span><b>ปลดออกจากคลัง:</b> {fdate(item.retired_at)}</span>
 </div>
 <div className="pv-stem">{ver?.stem || "—"}</div>
+<StemImages images={ver?.stem_images} />
 {item.type === "mcq" ? (
 <div style={{ marginBottom: 12 }}>
 {options.map((o) => (
@@ -153,6 +155,7 @@ return (
 <span className="lb">{o.label}</span>
 <div style={{ flex: 1 }}>
 <div>{o.body}{o.is_correct && <span className="pv-badge">เฉลย</span>}</div>
+<OptImage url={o.image_url} width={o.image_width} />
 {perOption && o.rationale && <div className="pv-orat">{o.rationale}</div>}
 </div>
 </div>

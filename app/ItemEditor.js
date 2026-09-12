@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { BLOOM, DIFF, OPT_LABELS, STATUS_TH } from "../lib/constants";
 import { ICD_SYSTEMS } from "../lib/tos.mjs";
 function vpayload(form, itemId, versionNo) {
-const p = { stem: form.stem, rationale: form.rationale_mode === "per_option" ? null : (form.rationale || null), rationale_mode: form.rationale_mode };
+const p = { stem: form.stem, rationale: form.rationale_mode === "per_option" ? null : (form.rationale || null), rationale_mode: form.rationale_mode, stem_images: form.stemImages || [] };
 if (versionNo) { p.item_id = itemId; p.version_no = versionNo; }
 if (form.type === "meq") { p.meq_model_answer = form.meq_model_answer || null; p.meq_max_score = form.meq_max_score ? Number(form.meq_max_score) : null; }
 return p;
@@ -21,6 +21,7 @@ bloom_level: item?.bloom_level || "",
 difficulty_target: item?.difficulty_target || "",
 exam_year: item?.exam_year ?? "",
 stem: "", rationale: "", rationale_mode: "combined", meq_model_answer: "", meq_max_score: "",
+stemImages: [],
 status: item?.status || "draft",
 });
 const [options, setOptions] = useState([
@@ -65,11 +66,11 @@ if (!item?.current_version_id) return;
 try {
 const { data: v, error: versionError } = await sb.from("bank_item_versions").select("*").eq("id", item.current_version_id).maybeSingle();
 if (versionError || !v) throw new Error("load");
-if (v) setForm((s) => ({ ...s, stem: v.stem || "", rationale: v.rationale || "", rationale_mode: v.rationale_mode || "combined", meq_model_answer: v.meq_model_answer || "", meq_max_score: v.meq_max_score ?? "" }));
+if (v) setForm((s) => ({ ...s, stem: v.stem || "", rationale: v.rationale || "", rationale_mode: v.rationale_mode || "combined", meq_model_answer: v.meq_model_answer || "", meq_max_score: v.meq_max_score ?? "", stemImages: Array.isArray(v.stem_images) ? v.stem_images : [] }));
 if (item.type === "mcq") {
 const { data: o, error: optionsError } = await sb.from("bank_item_options").select("*").eq("version_id", item.current_version_id).order("order_index");
 if (optionsError) throw optionsError;
-if (o && o.length) setOptions(o.map((x) => ({ label: x.label, body: x.body, is_correct: x.is_correct, rationale: x.rationale || "" })));
+if (o && o.length) setOptions(o.map((x) => ({ label: x.label, body: x.body, is_correct: x.is_correct, rationale: x.rationale || "", image_url: x.image_url || null, image_width: x.image_width || null })));
 }
 } catch { setLoadError(true); } finally { setLoading(false); }
 })();
@@ -77,6 +78,12 @@ if (o && o.length) setOptions(o.map((x) => ({ label: x.label, body: x.body, is_c
 const subOpts = bp.subitems.filter((s) => s.domain_code === form.nl_domain_code);
 const set = (k, v) => setForm({ ...form, [k]: v });
 const setOpt = (i, k, v) => setOptions(options.map((o, idx) => idx === i ? { ...o, [k]: v } : (k === "is_correct" ? { ...o, is_correct: false } : o)));
+const uploadImage = async (file) => { if (!file) return null; const ext = (file.name.split(".").pop() || "png").toLowerCase(); const path = `items/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`; const { error } = await sb.storage.from("question-images").upload(path, file); if (error) { notify("อัปโหลดรูปไม่สำเร็จ: " + error.message); return null; } return sb.storage.from("question-images").getPublicUrl(path).data.publicUrl; };
+const addStemImage = async (file) => { const url = await uploadImage(file); if (url) { setDirty(true); setForm((f) => ({ ...f, stemImages: [...(f.stemImages || []), { url, align: "center", width: 60 }] })); } };
+const updStemImage = (i, k, v) => { setDirty(true); setForm((f) => ({ ...f, stemImages: (f.stemImages || []).map((im, j) => j === i ? { ...im, [k]: v } : im) })); };
+const rmStemImage = (i) => { setDirty(true); setForm((f) => ({ ...f, stemImages: (f.stemImages || []).filter((_, j) => j !== i) })); };
+const setOptImage = async (i, file) => { const url = await uploadImage(file); if (url) { setDirty(true); setOptions((os) => os.map((o, j) => j === i ? { ...o, image_url: url, image_width: o.image_width || 50 } : o)); } };
+const updOpt = (i, k, v) => { setDirty(true); setOptions((os) => os.map((o, j) => j === i ? { ...o, [k]: v } : o)); };
 const save = async () => {
 if (previewOnly || busy || loading || loadError) return;
 if (!form.stem.trim()) return notify("กรุณากรอกโจทย์");
@@ -105,7 +112,7 @@ if (e2) throw e2;
 }
 if (form.type === "mcq") {
 await sb.from("bank_item_options").delete().eq("version_id", versionId);
-const rows = options.filter((o) => o.body.trim()).map((o, i) => ({ version_id: versionId, label: o.label, body: o.body, is_correct: !!o.is_correct, rationale: o.rationale || null, order_index: i }));
+const rows = options.filter((o) => o.body.trim() || o.image_url).map((o, i) => ({ version_id: versionId, label: o.label, body: o.body, is_correct: !!o.is_correct, rationale: o.rationale || null, order_index: i, image_url: o.image_url || null, image_width: o.image_url ? (o.image_width || 50) : null }));
 if (rows.length) { const { error: e3 } = await sb.from("bank_item_options").insert(rows); if (e3) throw e3; }
 }
 notify("บันทึกแล้ว"); onSaved();
@@ -172,6 +179,17 @@ return (
 </div>
 <div className="field"><label htmlFor="editor-field-8">ปีการศึกษา (พ.ศ.) — สำหรับคลังแยกปี</label><input id="editor-field-8" type="number" value={form.exam_year} onChange={(e) => set("exam_year", e.target.value)} placeholder="เช่น 2568 (เว้นว่างได้)" /></div>
 <div className="field"><label htmlFor="editor-field-9">โจทย์ (stem)</label><textarea id="editor-field-9" value={form.stem} onChange={(e) => set("stem", e.target.value)} /></div>
+<div className="field"><label>รูปภาพประกอบโจทย์ (แนบได้หลายรูป)</label>
+<input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) addStemImage(f); e.target.value = ""; }} />
+{(form.stemImages || []).map((im, i) => (
+<div key={i} className="qimg-edit">
+<img src={im.url} alt="" style={{ width: 90, height: 60, objectFit: "cover", borderRadius: 6 }} />
+<select value={im.align || "center"} onChange={(e) => updStemImage(i, "align", e.target.value)}><option value="left">ชิดซ้าย</option><option value="center">กึ่งกลาง</option><option value="right">ชิดขวา</option></select>
+<label className="mk" style={{ margin: 0, display: "flex", alignItems: "center", gap: 4 }}>กว้าง %<input type="number" min="10" max="100" step="5" style={{ width: 70 }} value={im.width || 60} onChange={(e) => updStemImage(i, "width", Number(e.target.value))} /></label>
+<button type="button" className="btn ghost sm" style={{ color: "var(--stop)" }} onClick={() => rmStemImage(i)}>ลบรูป</button>
+</div>
+))}
+</div>
 {form.type === "mcq" ? (
 <>
 <div className="field"><label htmlFor="editor-field-10">โหมดเฉลย/คำอธิบาย</label>
@@ -188,6 +206,10 @@ return (
 <input aria-label={"ข้อความตัวเลือก " + o.label} value={o.body} onChange={(e) => setOpt(i, "body", e.target.value)} placeholder={"ตัวเลือก " + o.label} />
 </div>
 {perOption && <input aria-label={"เหตุผลตัวเลือก " + o.label} style={{ marginTop: 4, marginLeft: 34, width: "calc(100% - 34px)" }} value={o.rationale} onChange={(e) => setOpt(i, "rationale", e.target.value)} placeholder={"เหตุผล " + o.label + " (ถูก/ผิดเพราะ…)"} />}
+<div className="opt-img-row" style={{ marginLeft: 34 }}>
+<input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) setOptImage(i, f); e.target.value = ""; }} />
+{o.image_url && <><img src={o.image_url} alt="" style={{ width: 70, height: 46, objectFit: "cover", borderRadius: 4 }} /><label className="mk" style={{ margin: 0, display: "flex", alignItems: "center", gap: 4 }}>กว้าง %<input type="number" min="10" max="100" step="5" style={{ width: 64 }} value={o.image_width || 50} onChange={(e) => updOpt(i, "image_width", Number(e.target.value))} /></label><button type="button" className="btn ghost sm" style={{ color: "var(--stop)" }} onClick={() => updOpt(i, "image_url", null)}>ลบรูป</button></>}
+</div>
 </div>
 ))}
 <div className="row" style={{ marginTop: 6 }}>

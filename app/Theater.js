@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { STATUS_TH } from "../lib/constants";
 import ItemEditor from "./ItemEditor";
+import { StemImages, OptImage } from "./QImages";
 export default function Theater({ sb, bp, me, notify }) {
 const [pool, setPool] = useState([]);
 const [idx, setIdx] = useState(0);
@@ -119,10 +120,12 @@ return (
 </div>
 <div className="muted" style={{ margin: "6px 0 14px" }}>{domainTitle}{item.nl_subitem ? " → " + item.nl_subitem : ""} · {specName}</div>
 <div className="th-stem">{ver?.stem || "—"}</div>
+<StemImages images={ver?.stem_images} />
 {item.type === "mcq" ? options.map((o) => (
 <div key={o.id} className={"pv-opt" + (o.is_correct ? " correct" : "")}>
 <span className="lb">{o.label}</span>
 <div style={{ flex: 1 }}>{o.body}{o.is_correct && <span className="pv-badge">เฉลย</span>}
+<OptImage url={o.image_url} width={o.image_width} />
 {ver?.rationale_mode === "per_option" && o.rationale && <div className="pv-orat">{o.rationale}</div>}</div>
 </div>
 )) : <div className="pv-block"><span className="mk">แนวคำตอบ</span>{ver?.meq_model_answer || "—"}</div>}
