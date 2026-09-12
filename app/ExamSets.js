@@ -33,7 +33,7 @@ export default function ExamSets({sb,bp,me,notify}){
   let available;
   if(s.kind==='meq')available=await query(sb.from('meq_cases').select('id,title,document,academic_year').order('updated_at',{ascending:false}));
   else {
-   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level,icd_system,nl_group,use_count').eq('type','mcq').order('updated_at',{ascending:false}));
+   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level,icd_system,nl_group,use_count').eq('type','mcq').neq('status','personal').order('updated_at',{ascending:false}));
    const ids=available.map(x=>x.current_version_id).filter(Boolean);
    const versions=ids.length?await query(sb.from('bank_item_versions').select('id,stem').in('id',ids)):[];
    const stems=new Map(versions.map(v=>[v.id,v.stem]));available=available.map(x=>({...x,title:stems.get(x.current_version_id)||'ยังไม่มีโจทย์'}));

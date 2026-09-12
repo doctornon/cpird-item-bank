@@ -41,7 +41,7 @@ const [stats, setStats] = useState([]);
 const [loading, setLoading] = useState(true);
 const load = useCallback(async () => {
 setLoading(true);
-const { data } = await sb.from("bank_items").select("id,type,status,exam_year,nl_domain_code,nl_subitem,physician_task,specialty_id,use_count").eq("type", "mcq").limit(5000);
+const { data } = await sb.from("bank_items").select("id,type,status,exam_year,nl_domain_code,nl_subitem,physician_task,specialty_id,use_count").eq("type", "mcq").neq("status", "personal").limit(5000);
 setItems(data || []);
 const { data: st } = await sb.from("bank_item_stats").select("item_id,n,p_value,discrimination,computed_at").order("computed_at", { ascending: false }).limit(20000);
 const latest = {};

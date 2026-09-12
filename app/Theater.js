@@ -15,7 +15,7 @@ const [myComment, setMyComment] = useState("");
 const [busy, setBusy] = useState(false);
 const [editing, setEditing] = useState(null);
 const loadPool = useCallback(async () => {
-let q = sb.from("bank_items").select("*").order("updated_at", { ascending: false }).limit(500);
+let q = sb.from("bank_items").select("*").neq("status", "personal").order("updated_at", { ascending: false }).limit(500);
 if (filter.status) q = q.eq("status", filter.status);
 if (filter.domain) q = q.eq("nl_domain_code", filter.domain);
 const { data } = await q;

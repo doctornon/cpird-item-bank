@@ -4,9 +4,11 @@ import { getSupabase } from "../lib/supabaseClient";
 import StaffShell from "./StaffShell";
 import Dashboard from "./Dashboard";
 import Bank from "./Bank";
+import MyBank from "./MyBank";
 import MeqBank from "./MeqBank";
 import Theater from "./Theater";
 import ExamSets from "./ExamSets";
+import ScoreAnalytics from "./ScoreAnalytics";
 import Import from "./Import";
 import RolesAdmin from "./RolesAdmin";
 import DeliveryPortal from "./DeliveryPortal";
@@ -81,9 +83,11 @@ return (
 {tab === "dashboard" && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "meq" && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
+{tab === "mybank" && canWrite && <MyBank sb={sb} bp={bp} me={me} canWrite={canWrite} notify={notify} />}
 {canApprove && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
+{tab === "scores" && canApprove && <ScoreAnalytics sb={sb} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}
 </div>

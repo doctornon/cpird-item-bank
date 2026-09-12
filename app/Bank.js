@@ -21,7 +21,7 @@ const [sort, setSort] = useState({ key: "id", dir: "asc" });
 const load = useCallback(async () => {
 setLoading(true);
 setLoadError(false);
-const { data, error } = await sb.from("bank_items").select("*").eq("type", bankType).order("updated_at", { ascending: false }).limit(500);
+const { data, error } = await sb.from("bank_items").select("*").eq("type", bankType).neq("status", "personal").order("updated_at", { ascending: false }).limit(500);
 if (error) { setLoadError(true); setLoading(false); return; }
 const list = data || [];
 setItems(list);

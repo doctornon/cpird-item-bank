@@ -8,7 +8,7 @@ if (versionNo) { p.item_id = itemId; p.version_no = versionNo; }
 if (form.type === "meq") { p.meq_model_answer = form.meq_model_answer || null; p.meq_max_score = form.meq_max_score ? Number(form.meq_max_score) : null; }
 return p;
 }
-export default function ItemEditor({ sb, bp, item, canApprove, onClose, onSaved, notify, previewOnly = false, previewNotice = "", initialType = "mcq" }) {
+export default function ItemEditor({ sb, bp, item, canApprove, onClose, onSaved, notify, previewOnly = false, previewNotice = "", initialType = "mcq", createStatus = null }) {
 const [form, setForm] = useState({
 type: item?.type || initialType,
 nl_domain_code: item?.nl_domain_code || "",
@@ -88,6 +88,7 @@ physician_task: form.physician_task || null, specialty_id: form.specialty_id ? N
 icd_system: form.icd_system ? Number(form.icd_system) : null, nl_group: form.nl_group ? Number(form.nl_group) : null,
 bloom_level: form.bloom_level || null, difficulty_target: form.difficulty_target || null,
 exam_year: form.exam_year ? Number(form.exam_year) : null,
+...(createStatus && !item?.id ? { status: createStatus } : {}),
 };
 let itemId = item?.id, versionId = item?.current_version_id;
 if (!itemId) {
