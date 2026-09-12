@@ -8,6 +8,7 @@ const [options, setOptions] = useState([]);
 const [stats, setStats] = useState([]);
 const [review, setReview] = useState(null);
 const [usage, setUsage] = useState([]);
+const [usageLog, setUsageLog] = useState([]);
 const [busy, setBusy] = useState(false);
 useEffect(() => {
 (async () => {
@@ -25,6 +26,8 @@ const { data: rs } = await sb.from("v_item_review_summary").select("*").eq("item
 setReview(rs || null);
 const { data: us } = await sb.rpc("bank_item_usage", { _item_id: item.id });
 setUsage(us || []);
+const { data: ul } = await sb.from("bank_item_usage_log").select("*").eq("item_id", item.id).order("used_on", { ascending: false });
+setUsageLog(ul || []);
 })();
 }, [item, sb]);
 const domainIdx = bp.domains.findIndex((d) => d.code === item.nl_domain_code);
@@ -159,6 +162,11 @@ return (
 <table style={{ marginTop: 6 }}><thead><tr><th>การสอบ</th><th>ชุด</th><th>วันที่</th><th>สถานะ</th></tr></thead>
 <tbody>{usage.map((u) => <tr key={u.assignment_id}><td>{u.title}</td><td>{u.set_name}</td><td>{fdate(u.open_at)}</td><td>{u.status === "open" ? "เปิดสอบ" : "ปิดแล้ว"}</td></tr>)}</tbody></table>
 )}
+{usageLog.length > 0 && <>
+<div className="mk" style={{ marginTop: 10 }}>บันทึกการใช้ (log) — {usageLog.length} ครั้ง</div>
+<table style={{ marginTop: 6 }}><thead><tr><th>วันที่ใช้สอบ</th><th>รอบ / หมายเหตุ</th><th>ที่มา</th><th>ผู้เข้าสอบ</th></tr></thead>
+<tbody>{usageLog.map((u) => <tr key={u.id}><td>{fdate(u.used_on)}</td><td>{u.note || "—"}</td><td>{u.source || "—"}</td><td>{u.n_examinees ?? "—"}</td></tr>)}</tbody></table>
+</>}
 </div>
 <div className="row" style={{ justifyContent: "space-between", marginTop: 14, alignItems: "center" }}>
 <div className="row" style={{ gap: 6 }}>
