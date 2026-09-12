@@ -1,14 +1,17 @@
 "use client";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { STATUS, STATUS_TH } from "../lib/constants";
+import { ICD_SYSTEMS } from "../lib/tos.mjs";
 import ItemEditor from "./ItemEditor";
 import ItemPreview from "./ItemPreview";
+const ICD_ROMAN = Object.fromEntries(ICD_SYSTEMS.map((s) => [s.code, s.roman]));
+const ICD_TH = Object.fromEntries(ICD_SYSTEMS.map((s) => [s.code, s.roman + ". " + s.th]));
 export default function Bank({ sb, bp, me, canWrite, canApprove, notify, initialStatus = "", previewOnly = false, bankType = "mcq" }) {
 const [items, setItems] = useState([]);
 const [stems, setStems] = useState({});
 const [authors, setAuthors] = useState({});
 const [loading, setLoading] = useState(true);
-const [f, setF] = useState({ q: "", domain: [], task: [], spec: [], status: initialStatus, type: bankType, year: [] });
+const [f, setF] = useState({ q: "", domain: [], task: [], spec: [], icd: [], status: initialStatus, type: bankType, year: [] });
 const [advanced, setAdvanced] = useState(false);
 const [openDrop, setOpenDrop] = useState(null);
 const [loadError, setLoadError] = useState(false);
@@ -43,11 +46,12 @@ const toggleMulti = (key, value) => setF((prev) => {
 const cur = prev[key] || [];
 return { ...prev, [key]: cur.includes(value) ? cur.filter((v) => v !== value) : [...cur, value] };
 });
-const advCount = f.domain.length + f.task.length + f.spec.length + f.year.length;
+const advCount = f.domain.length + f.task.length + f.spec.length + f.icd.length + f.year.length;
 const filtered = items.filter((it) => {
 if (f.domain.length && !f.domain.includes(it.nl_domain_code)) return false;
 if (f.task.length && !f.task.includes(it.physician_task)) return false;
 if (f.spec.length && !f.spec.includes(String(it.specialty_id))) return false;
+if (f.icd.length && !f.icd.includes(String(it.icd_system))) return false;
 if (f.status && it.status !== f.status) return false;
 if (f.type && it.type !== f.type) return false;
 if (f.year.length && !f.year.includes(String(it.exam_year))) return false;
@@ -64,6 +68,7 @@ if (key === "cat") return domainTitle(it.nl_domain_code).toLowerCase();
 if (key === "sub") return (it.nl_subitem || "").toLowerCase();
 if (key === "task") return taskName(it.physician_task).toLowerCase();
 if (key === "spec") return specName(it.specialty_id).toLowerCase();
+if (key === "icd") return it.icd_system ?? 999;
 if (key === "author") return (authors[it.author_id] || "").toLowerCase();
 if (key === "status") return STATUS.indexOf(it.status);
 return "";
@@ -102,7 +107,7 @@ return (
 <button className="btn ghost" aria-expanded={advanced} aria-controls="bank-advanced" onClick={() => setAdvanced(!advanced)}>ตัวกรองเพิ่มเติม{advCount ? ` (${advCount})` : ""}</button>
 </div>
 {advanced && <div id="bank-advanced" className="bank-advanced">
-{[["domain", "หมวด", bp.domains.map(d => [d.code, d.title])], ["task", "ภารกิจ", bp.tasks.map(t => [t.code, t.name])], ["spec", "สาขา", bp.specs.map(x => [String(x.id), x.name_th])], ["year", "ปี พ.ศ.", years.map(y => [String(y), String(y)])]].map(([key, label, options]) => {
+{[["domain", "หมวด", bp.domains.map(d => [d.code, d.title])], ["task", "ภารกิจ", bp.tasks.map(t => [t.code, t.name])], ["spec", "สาขา", bp.specs.map(x => [String(x.id), x.name_th])], ["icd", "ระบบโรค (ICD)", ICD_SYSTEMS.map(s => [String(s.code), s.roman + ". " + s.th])], ["year", "ปี พ.ศ.", years.map(y => [String(y), String(y)])]].map(([key, label, options]) => {
 const sel = f[key];
 const summary = sel.length === 0 ? "ทั้งหมด" : sel.length === 1 ? (options.find(([v]) => v === sel[0])?.[1] || "1 รายการ") : `เลือกแล้ว ${sel.length} รายการ`;
 return <div key={key} className="bank-drop">
@@ -118,7 +123,7 @@ return <div key={key} className="bank-drop">
 </div>;
 })}
 </div>}
-<div className="result-summary" role="status"><span>{loading ? "กำลังโหลดข้อสอบ…" : loadError ? "โหลดข้อมูลไม่สำเร็จ" : `พบ ${filtered.length} ข้อ จาก ${items.length} ข้อที่โหลด`}{!loading && items.length === 500 ? " · แสดง 500 ข้อล่าสุด" : ""}</span>{hasFilter && <button className="text-action" onClick={() => setF({ q: "", domain: [], task: [], spec: [], status: "", type: bankType, year: [] })}>ล้างตัวกรองทั้งหมด</button>}</div>
+<div className="result-summary" role="status"><span>{loading ? "กำลังโหลดข้อสอบ…" : loadError ? "โหลดข้อมูลไม่สำเร็จ" : `พบ ${filtered.length} ข้อ จาก ${items.length} ข้อที่โหลด`}{!loading && items.length === 500 ? " · แสดง 500 ข้อล่าสุด" : ""}</span>{hasFilter && <button className="text-action" onClick={() => setF({ q: "", domain: [], task: [], spec: [], icd: [], status: "", type: bankType, year: [] })}>ล้างตัวกรองทั้งหมด</button>}</div>
 {loadError ? <div className="empty card" role="alert"><p>โหลดคลังข้อสอบไม่สำเร็จ กรุณาลองอีกครั้ง</p><button className="btn ghost" onClick={load}>ลองใหม่</button></div> : <div className="tablewrap">
 <table className="bank-table"><caption className="sr-only">รายการข้อสอบที่ตรงกับตัวกรอง</caption>
 <thead><tr>
@@ -128,13 +133,14 @@ return <div key={key} className="bank-drop">
 <th aria-sort={aria("sub")}><button type="button" className="th-sort" onClick={() => toggleSort("sub")}>หมวดย่อย{arrow("sub")}</button></th>
 <th aria-sort={aria("task")}><button type="button" className="th-sort" onClick={() => toggleSort("task")}>ภารกิจ{arrow("task")}</button></th>
 <th aria-sort={aria("spec")}><button type="button" className="th-sort" onClick={() => toggleSort("spec")}>สาขา{arrow("spec")}</button></th>
+<th aria-sort={aria("icd")}><button type="button" className="th-sort" onClick={() => toggleSort("icd")}>ICD{arrow("icd")}</button></th>
 <th aria-sort={aria("author")}><button type="button" className="th-sort" onClick={() => toggleSort("author")}>ผู้ออก{arrow("author")}</button></th>
 <th aria-sort={aria("status")}><button type="button" className="th-sort" onClick={() => toggleSort("status")}>สถานะ{arrow("status")}</button></th>
 <th><span className="sr-only">การดำเนินการ</span></th>
 </tr></thead>
 <tbody>
-{loading && <tr><td colSpan={9}><div className="empty">กำลังโหลด…</div></td></tr>}
-{!loading && sorted.length === 0 && <tr><td colSpan={9}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
+{loading && <tr><td colSpan={10}><div className="empty">กำลังโหลด…</div></td></tr>}
+{!loading && sorted.length === 0 && <tr><td colSpan={10}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
 {!loading && sorted.map(it => <tr key={it.id}>
 <td className="item-idcell">#{it.id}</td>
 <td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span><span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
@@ -142,6 +148,7 @@ return <div key={key} className="bank-drop">
 <td>{it.nl_subitem || "—"}</td>
 <td>{taskName(it.physician_task) || "—"}</td>
 <td>{specName(it.specialty_id) || "—"}</td>
+<td title={ICD_TH[it.icd_system] || ""}>{it.icd_system ? ICD_ROMAN[it.icd_system] : "—"}</td>
 <td>{authors[it.author_id] || "—"}</td><td><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span></td><td><div className="item-actions"><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button>{canWrite && <button className="btn ghost sm" disabled={previewOnly} aria-label={"แก้ไขข้อสอบ " + it.id} onClick={() => setEditing(it)}>แก้ไข</button>}</div></td>
 </tr>)}
 </tbody></table></div>}

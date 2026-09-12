@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { BLOOM, DIFF, OPT_LABELS, STATUS_TH } from "../lib/constants";
+import { ICD_SYSTEMS } from "../lib/tos.mjs";
 function vpayload(form, itemId, versionNo) {
 const p = { stem: form.stem, rationale: form.rationale_mode === "per_option" ? null : (form.rationale || null), rationale_mode: form.rationale_mode };
 if (versionNo) { p.item_id = itemId; p.version_no = versionNo; }
@@ -14,6 +15,8 @@ nl_domain_code: item?.nl_domain_code || "",
 nl_subitem: item?.nl_subitem || "",
 physician_task: item?.physician_task || "",
 specialty_id: item?.specialty_id ? String(item.specialty_id) : "",
+icd_system: item?.icd_system ? String(item.icd_system) : "",
+nl_group: item?.nl_group ? String(item.nl_group) : "",
 bloom_level: item?.bloom_level || "",
 difficulty_target: item?.difficulty_target || "",
 exam_year: item?.exam_year ?? "",
@@ -82,6 +85,7 @@ try {
 const meta = {
 type: form.type, nl_domain_code: form.nl_domain_code || null, nl_subitem: form.nl_subitem || null,
 physician_task: form.physician_task || null, specialty_id: form.specialty_id ? Number(form.specialty_id) : null,
+icd_system: form.icd_system ? Number(form.icd_system) : null, nl_group: form.nl_group ? Number(form.nl_group) : null,
 bloom_level: form.bloom_level || null, difficulty_target: form.difficulty_target || null,
 exam_year: form.exam_year ? Number(form.exam_year) : null,
 };
@@ -149,6 +153,16 @@ return (
 <div className="field"><label htmlFor="editor-field-5">สาขา</label>
 <select id="editor-field-5" value={form.specialty_id} onChange={(e) => set("specialty_id", e.target.value)}>
 <option value="">— เลือก —</option>{bp.specs.map((s) => <option key={s.id} value={String(s.id)}>{s.name_th}</option>)}
+</select></div>
+</div>
+<div className="grid2">
+<div className="field"><label htmlFor="editor-field-icd">ระบบโรค (ICD) — ตาม Table of Spec</label>
+<select id="editor-field-icd" value={form.icd_system} onChange={(e) => set("icd_system", e.target.value)}>
+<option value="">— เลือก / ไม่ระบุ (หมวด1 ทั่วไป) —</option>{ICD_SYSTEMS.map((s) => <option key={s.code} value={String(s.code)}>{s.roman}. {s.th}</option>)}
+</select></div>
+<div className="field"><label htmlFor="editor-field-grp">กลุ่ม (1 ฉุกเฉิน / 2 / 3)</label>
+<select id="editor-field-grp" value={form.nl_group} onChange={(e) => set("nl_group", e.target.value)}>
+<option value="">— เลือก / ยังไม่ระบุ —</option><option value="1">กลุ่ม 1 (ฉุกเฉิน)</option><option value="2">กลุ่ม 2</option><option value="3">กลุ่ม 3</option>
 </select></div>
 </div>
 <div className="grid2">
