@@ -187,7 +187,7 @@ matrix={covTask} />
 {specsWithItems.length === 0 ? <div className="muted">ยังไม่มีข้อสอบที่ระบุสาขา</div> : (
 <div className="tablewrap" style={{ boxShadow: "none" }}>
 <Heat cols={{ axis: "สาขา", items: specsWithItems.map((s) => ({ label: s.name_en || s.name_th, title: s.name_th })) }}
-rows={bp.domains.map((d) => ({ label: d.code, title: d.title }))}
+rows={bp.domains.map((d) => ({ label: d.code, title: d.title, sub: (d.title || "").replace(d.code, "").replace(/^[.\s]+/, "").slice(0, 18) }))}
 matrix={covSpec} />
 </div>
 )}
