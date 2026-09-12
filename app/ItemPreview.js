@@ -75,12 +75,21 @@ notify && notify("ทำซ้ำเป็นข้อใหม่ #" + data + "
 onClose(); onChanged && onChanged();
 };
 const del = async () => {
-if (!confirm("ลบข้อ #" + item.id + " ถาวร?\n(ถ้าอยู่ในชุดข้อสอบ หรือเคยใช้สอบจริง จะลบไม่ได้ — ให้ใช้สถานะ “ปลด” แทน)")) return;
+if (!confirm("ลบข้อ #" + item.id + " ถาวร?\n(ถ้าอยู่ในชุดข้อสอบ หรือเคยใช้สอบจริง จะลบไม่ได้ — ให้ใช้ปุ่ม “ปลดออกจากคลัง” แทน)")) return;
 setBusy(true);
 const { error } = await sb.rpc("bank_delete_item", { _id: item.id });
 setBusy(false);
 if (error) return notify && notify("ลบไม่ได้: " + error.message);
 notify && notify("ลบข้อ #" + item.id + " แล้ว");
+onClose(); onChanged && onChanged();
+};
+const setStatus = async (newStatus, verb) => {
+if (newStatus === "retired" && !confirm("ปลดข้อ #" + item.id + " ออกจากคลัง?\nข้อจะไม่ถูกนำไปใช้สอบใหม่ แต่ยังเก็บไว้ในระบบ และนำกลับเข้าคลังได้ภายหลัง")) return;
+setBusy(true);
+const { error } = await sb.from("bank_items").update({ status: newStatus }).eq("id", item.id);
+setBusy(false);
+if (error) return notify && notify(verb + "ไม่สำเร็จ: " + error.message);
+notify && notify(verb + "ข้อ #" + item.id + " แล้ว");
 onClose(); onChanged && onChanged();
 };
 return (
@@ -155,6 +164,8 @@ return (
 <div className="row" style={{ gap: 6 }}>
 <button className="btn ghost sm" onClick={copy}>📋 คัดลอกไป Word</button>
 {canWrite && <button className="btn ghost sm" onClick={duplicate} disabled={busy}>⧉ ทำซ้ำ</button>}
+{canApprove && item.status !== "retired" && <button className="btn ghost sm" style={{ color: "var(--warn, #b26a00)" }} onClick={() => setStatus("retired", "ปลดออกจากคลัง")} disabled={busy}>⤓ ปลดออกจากคลัง</button>}
+{canApprove && item.status === "retired" && <button className="btn ghost sm" style={{ color: "var(--good)" }} onClick={() => setStatus("approved", "นำกลับเข้าคลัง")} disabled={busy}>↩ นำกลับเข้าคลัง</button>}
 {canApprove && <button className="btn ghost sm" style={{ color: "var(--stop)" }} onClick={del} disabled={busy}>🗑 ลบ</button>}
 </div>
 {canWrite && <button className="btn" onClick={onEdit}>แก้ไข</button>}
