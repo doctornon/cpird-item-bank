@@ -27,7 +27,9 @@ export default function ScoreAnalytics({ sb, bp, notify }) {
   const [answers, setAnswers] = useState(null);
   const [itemAnalysis, setItemAnalysis] = useState(null);
   const [q, setQ] = useState("");
-  const [ansFilter, setAnsFilter] = useState("all"); // all | correct | incorrect
+  const [ansFilter, setAnsFilter] = useState("all"); // all | correct | incorrect | bookmarked | selected
+  const [selIds, setSelIds] = useState(() => new Set());
+  const fmtAway = (s) => { s = Number(s) || 0; return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`; };
   const domainName = (code) => (bp?.domains || []).find((d) => d.code === code)?.title || code || "ไม่ระบุหมวด";
 
   const load = useCallback(async () => {
@@ -112,15 +114,37 @@ export default function ScoreAnalytics({ sb, bp, notify }) {
     const cats = {};
     ans.forEach((a) => { const k = a.domain_code || "—"; const c = cats[k] || (cats[k] = { n: 0, correct: 0 }); c.n++; if (a.is_correct) c.correct++; });
     const catRows = Object.entries(cats).map(([code, c]) => ({ code, name: code === "—" ? "ไม่ระบุหมวด" : domainName(code), ...c })).sort((x, y) => y.n - x.n);
-    const shown = ansFilter === "all" ? ans : ans.filter((a) => (ansFilter === "correct" ? a.is_correct : !a.is_correct));
+    const nBook = ans.filter((a) => a.bookmarked).length;
+    const shown = ansFilter === "all" ? ans : ansFilter === "correct" ? ans.filter((a) => a.is_correct) : ansFilter === "incorrect" ? ans.filter((a) => !a.is_correct) : ansFilter === "bookmarked" ? ans.filter((a) => a.bookmarked) : ans.filter((a) => selIds.has(a.item_id));
+    const toggleSel = (id) => setSelIds((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const attemptAct = async (action, label) => {
+      if (action === "delete_attempt" && !confirm("ลบผลสอบนี้ถาวร?")) return;
+      if (action === "reopen" && !confirm("เปิดให้ผู้สอบคนนี้สอบรอบนี้ได้อีก 1 ครั้ง?")) return;
+      const { error } = await sb.rpc("delivery_manage", { action, payload: { attempt_id: r.attempt_id } });
+      if (error) return notify("ผิดพลาด: " + error.message);
+      notify(label); if (action === "delete_attempt") { setSel((s) => ({ ...s, attempt: null })); setAnswers(null); } load();
+    };
+    const emailIt = () => {
+      if (!r.student_email) return notify("ผู้สอบคนนี้ไม่มีอีเมลในระบบ");
+      const subject = encodeURIComponent("ผลสอบ: " + r.assignment_title);
+      const body = encodeURIComponent(`เรียน ${r.student_name || ""}\n\nผลสอบ "${r.assignment_title}" ครั้งที่ ${r.attempt_no}\nคะแนน: ${r.score} / ${r.max_score} (${pct(r.percent)}) · ${r.passed ? "ผ่าน" : "ไม่ผ่าน"} (เกณฑ์ ${r.pass_mark}%)\nส่งเมื่อ: ${fdate(r.submitted_at)}\n\nคลังข้อสอบ CPIRD`);
+      window.location.href = `mailto:${r.student_email}?subject=${subject}&body=${body}`;
+    };
+    const filterLabel = { correct: " (เฉพาะถูก)", incorrect: " (เฉพาะผิด)", bookmarked: " (ปักหมุด)", selected: ` (ที่เลือก ${selIds.size})` }[ansFilter] || "";
     return (
       <div className="sa-attempt">
         <div className="row sa-noprint" style={{ justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <button className="btn ghost sm" onClick={() => { setSel((s) => ({ ...s, attempt: null })); setAnswers(null); setAnsFilter("all"); }}>‹ กลับ</button>
-          <button className="btn ghost sm" onClick={() => window.print()}>🖨 พิมพ์{ansFilter === "correct" ? " (เฉพาะถูก)" : ansFilter === "incorrect" ? " (เฉพาะผิด)" : ""}</button>
+          <button className="btn ghost sm" onClick={() => { setSel((s) => ({ ...s, attempt: null })); setAnswers(null); setAnsFilter("all"); setSelIds(new Set()); }}>‹ กลับ</button>
+          <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
+            <button className="btn ghost sm" onClick={() => attemptAct("reopen", "เปิดให้สอบใหม่อีก 1 ครั้งแล้ว")}>🔁 เปิดสอบใหม่</button>
+            <button className="btn ghost sm" disabled={!r.student_email} title={r.student_email || "ไม่มีอีเมล"} onClick={emailIt}>✉ อีเมลผล</button>
+            <button className="btn ghost sm" style={{ color: "var(--stop)" }} onClick={() => attemptAct("delete_attempt", "ลบผลสอบแล้ว")}>🗑 ลบผล</button>
+            <button className="btn ghost sm" onClick={() => window.print()}>🖨 พิมพ์{filterLabel}</button>
+          </div>
         </div>
         <div className="workspace-heading"><div><h2>{r.student_name || "ผู้สอบ"} {r.student_code ? "· " + r.student_code : ""}</h2>
-          <p>{r.assignment_title} · {r.set_name} · ครั้งที่ {r.attempt_no} · {fdate(r.submitted_at)}</p></div>
+          <p>{r.assignment_title} · {r.set_name} · ครั้งที่ {r.attempt_no} · {fdate(r.submitted_at)}</p>
+          <p className="muted">Monitor: {r.blur_count ? <span className="pill retired">ออกจากจอ {r.blur_count} ครั้ง · รวม {fmtAway(r.away_seconds)}</span> : <span className="pill approved">ไม่มีเหตุการณ์</span>}{r.student_email ? " · " + r.student_email : ""}</p></div>
           <div style={{ textAlign: "right" }}><div className="pv-big" style={{ color: r.passed ? "var(--good)" : "var(--stop)" }}>{pct(r.percent)}</div>
             <div className="muted">{r.score}/{r.max_score} · {r.passed ? "ผ่าน" : "ไม่ผ่าน"} (เกณฑ์ {r.pass_mark}%)</div></div>
         </div>
@@ -129,12 +153,13 @@ export default function ScoreAnalytics({ sb, bp, notify }) {
             <div className="tablewrap"><table><thead><tr><th>หมวด</th><th>ถูก</th><th>ทั้งหมด</th><th>ร้อยละ</th></tr></thead>
               <tbody>{catRows.map((c) => <tr key={c.code}><td>{c.name}</td><td>{c.correct}</td><td>{c.n}</td><td><span className={"pill " + (c.correct / c.n >= 0.5 ? "approved" : "retired")}>{pct(100 * c.correct / c.n)}</span></td></tr>)}</tbody></table></div></>}
           <div className="bank-status sa-noprint" style={{ marginTop: 12 }}>
-            {[["all", "ทุกข้อ " + ans.length], ["correct", "ถูก " + nCorrect], ["incorrect", "ผิด " + nIncorrect]].map(([v, l]) =>
+            {[["all", "ทุกข้อ " + ans.length], ["correct", "ถูก " + nCorrect], ["incorrect", "ผิด " + nIncorrect], ["bookmarked", "ปักหมุด " + nBook], ["selected", "ที่เลือก " + selIds.size]].map(([v, l]) =>
               <button key={v} className={"status-filter" + (ansFilter === v ? " selected" : "")} aria-pressed={ansFilter === v} onClick={() => setAnsFilter(v)}>{l}</button>)}
+            {selIds.size > 0 && <button className="btn ghost sm" style={{ marginLeft: "auto" }} onClick={() => { setAnsFilter("selected"); setTimeout(() => window.print(), 150); }}>🖨 พิมพ์ที่เลือก ({selIds.size})</button>}
           </div>
-          <div className="tablewrap"><table><thead><tr><th>#</th><th>หมวด</th><th>โจทย์</th><th>ตอบ</th><th>เฉลย</th><th>ผล</th><th>คะแนน</th></tr></thead>
-            <tbody>{shown.length === 0 ? <tr><td colSpan={7}><div className="empty">ไม่มีข้อในเงื่อนไขนี้</div></td></tr> :
-              shown.map((a, i) => <tr key={a.item_id + "_" + i}><td>{i + 1}</td>
+          <div className="tablewrap"><table><thead><tr><th className="sa-noprint"><input type="checkbox" aria-label="เลือกทั้งหมดที่แสดง" checked={shown.length > 0 && shown.every((a) => selIds.has(a.item_id))} onChange={(e) => setSelIds((s) => { const n = new Set(s); shown.forEach((a) => e.target.checked ? n.add(a.item_id) : n.delete(a.item_id)); return n; })} /></th><th>#</th><th>หมวด</th><th>โจทย์</th><th>ตอบ</th><th>เฉลย</th><th>ผล</th><th>คะแนน</th></tr></thead>
+            <tbody>{shown.length === 0 ? <tr><td colSpan={8}><div className="empty">ไม่มีข้อในเงื่อนไขนี้</div></td></tr> :
+              shown.map((a, i) => <tr key={a.item_id + "_" + i}><td className="sa-noprint"><input type="checkbox" checked={selIds.has(a.item_id)} onChange={() => toggleSel(a.item_id)} /></td><td>{i + 1}{a.bookmarked ? " 📌" : ""}</td>
                 <td>{a.domain_code || "—"}</td>
                 <td style={{ maxWidth: 420 }}>{(a.stem || "").slice(0, 200)}</td>
                 <td>{a.selected_label || (a.essay_text ? "(อัตนัย)" : "—")}</td>
