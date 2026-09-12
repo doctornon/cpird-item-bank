@@ -1,190 +1,55 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-const SET_STATUS_TH = { draft: "ร่าง", ready: "พร้อมใช้", archived: "เก็บ" };
-export default function ExamSets({ sb, bp, me, notify }) {
-const [sets, setSets] = useState([]);
-const [sel, setSel] = useState(null);
-const [setItems, setSetItems] = useState([]);
-const [meta, setMeta] = useState({});
-const [newName, setNewName] = useState("");
-const [newDesc, setNewDesc] = useState("");
-const [picker, setPicker] = useState(false);
-const [pool, setPool] = useState([]);
-const [poolStems, setPoolStems] = useState({});
-const [pf, setPf] = useState({ q: "", domain: "", spec: "", type: "" });
-const loadSets = useCallback(async () => {
-const { data } = await sb.from("exam_sets").select("*").order("updated_at", { ascending: false });
-setSets(data || []);
-}, [sb]);
-useEffect(() => { loadSets(); }, [loadSets]);
-const loadItems = useCallback(async (setId) => {
-const { data } = await sb.from("exam_set_items").select("*").eq("exam_set_id", setId).order("position");
-const list = data || []; setSetItems(list);
-const ids = list.map((x) => x.item_id);
-if (ids.length) {
-const { data: its } = await sb.from("bank_items").select("id,current_version_id,type,nl_domain_code,nl_subitem").in("id", ids);
-const vids = (its || []).map((x) => x.current_version_id).filter(Boolean);
-const vmap = {};
-if (vids.length) { const { data: vs } = await sb.from("bank_item_versions").select("id,stem").in("id", vids); (vs || []).forEach((v) => { vmap[v.id] = v.stem; }); }
-const m = {}; (its || []).forEach((it) => { m[it.id] = { stem: vmap[it.current_version_id] || "", type: it.type, dom: it.nl_domain_code, sub: it.nl_subitem }; });
-setMeta(m);
-} else setMeta({});
-}, [sb]);
-const openSet = async (s) => { setSel(s); await loadItems(s.id); };
-const createSet = async () => {
-if (!newName.trim()) return notify("กรุณาตั้งชื่อชุดข้อสอบ");
-const { data, error } = await sb.from("exam_sets").insert({ name: newName, description: newDesc || null, created_by: me }).select("*").single();
-if (error) return notify("ผิดพลาด: " + error.message);
-setNewName(""); setNewDesc(""); await loadSets(); notify("สร้างชุดแล้ว"); openSet(data);
-};
-const setStatus = async (st) => {
-if (!sel) return;
-const { error } = await sb.from("exam_sets").update({ status: st, updated_at: new Date().toISOString() }).eq("id", sel.id);
-if (error) return notify("ผิดพลาด: " + error.message);
-setSel({ ...sel, status: st }); loadSets(); notify("อัปเดตสถานะ");
-};
-const loadPool = useCallback(async () => {
-let q = sb.from("bank_items").select("id,current_version_id,type,nl_domain_code,nl_subitem,specialty_id,use_count,status").eq("status", "approved").order("updated_at", { ascending: false }).limit(500);
-if (pf.domain) q = q.eq("nl_domain_code", pf.domain);
-if (pf.spec) q = q.eq("specialty_id", Number(pf.spec));
-if (pf.type) q = q.eq("type", pf.type);
-const { data } = await q; const list = data || []; setPool(list);
-const vids = list.map((x) => x.current_version_id).filter(Boolean);
-if (vids.length) { const { data: vs } = await sb.from("bank_item_versions").select("id,stem").in("id", vids); const m = {}; (vs || []).forEach((v) => { m[v.id] = v.stem; }); setPoolStems(m); }
-}, [sb, pf]);
-useEffect(() => { if (picker) loadPool(); }, [picker, loadPool]);
-const inSet = (id) => setItems.some((x) => x.item_id === id);
-const addItem = async (it) => {
-if (inSet(it.id)) return;
-const pos = setItems.length ? Math.max(...setItems.map((x) => x.position)) + 1 : 1;
-const { error } = await sb.from("exam_set_items").insert({ exam_set_id: sel.id, item_id: it.id, position: pos, points: 1 });
-if (error) return notify("ผิดพลาด: " + error.message);
-loadItems(sel.id);
-};
-const removeItem = async (row) => {
-const { error } = await sb.from("exam_set_items").delete().eq("id", row.id);
-if (error) return notify("ผิดพลาด: " + error.message);
-loadItems(sel.id);
-};
-const move = async (i, dir) => {
-const j = i + dir; if (j < 0 || j >= setItems.length) return;
-const a = setItems[i], b = setItems[j];
-await sb.from("exam_set_items").update({ position: b.position }).eq("id", a.id);
-await sb.from("exam_set_items").update({ position: a.position }).eq("id", b.id);
-loadItems(sel.id);
-};
-const setPoints = async (row, val) => {
-const p = Number(val); if (isNaN(p)) return;
-await sb.from("exam_set_items").update({ points: p }).eq("id", row.id);
-setSetItems(setItems.map((x) => x.id === row.id ? { ...x, points: p } : x));
-};
-const specName = (id) => bp.specs.find((s) => s.id === id)?.name_th || "";
-const totalPoints = setItems.reduce((s, x) => s + Number(x.points || 0), 0);
-const poolFiltered = pool.filter((it) => {
-if (!pf.q) return true;
-const hay = ((poolStems[it.current_version_id] || "") + " " + (it.nl_subitem || "")).toLowerCase();
-return hay.includes(pf.q.toLowerCase());
-});
-return (
-<div className="theater">
-<div className="th-side">
-<div className="card" style={{ padding: 14, marginBottom: 12 }}>
-<label>ชื่อชุดข้อสอบใหม่</label>
-<input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="เช่น สอบ NL รอบเช้า 2568" />
-<input style={{ marginTop: 6 }} value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="คำอธิบาย (ถ้ามี)" />
-<button className="btn" style={{ marginTop: 8, width: "100%" }} onClick={createSet}>+ สร้างชุด</button>
-</div>
-<div className="muted" style={{ marginBottom: 6 }}>ชุดข้อสอบ ({sets.length})</div>
-<div className="th-list">
-{sets.map((s) => (
-<button key={s.id} className={"th-li" + (sel?.id === s.id ? " active" : "")} onClick={() => openSet(s)}>
-<span className="th-txt" style={{ flex: 1 }}>{s.name}</span>
-<span className={"pill " + (s.status === "ready" ? "approved" : s.status === "archived" ? "retired" : "draft")}>{SET_STATUS_TH[s.status] || s.status}</span>
-</button>
-))}
-{sets.length === 0 && <div className="muted">ยังไม่มีชุดข้อสอบ</div>}
-</div>
-</div>
-<div className="th-stage">
-{!sel ? <div className="empty">เลือกหรือสร้างชุดข้อสอบทางซ้าย</div> : (
-<>
-<div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-<h3>{sel.name}</h3>
-<div className="row" style={{ gap: 6, alignItems: "center" }}>
-<select value={sel.status} onChange={(e) => setStatus(e.target.value)} style={{ width: "auto" }}>
-<option value="draft">ร่าง</option><option value="ready">พร้อมใช้</option><option value="archived">เก็บ</option>
-</select>
-<button className="btn sm" onClick={() => setPicker(true)}>+ เพิ่มข้อจากคลัง</button>
-</div>
-</div>
-{sel.description && <div className="muted" style={{ marginBottom: 10 }}>{sel.description}</div>}
-<div className="stat" style={{ marginBottom: 12 }}>
-<div className="s"><div className="n">{setItems.length}</div><div className="k">จำนวนข้อ</div></div>
-<div className="s"><div className="n">{totalPoints}</div><div className="k">คะแนนรวม</div></div>
-</div>
-<div className="tablewrap">
-<table>
-<thead><tr><th>#</th><th>เลขข้อ</th><th>ชนิด</th><th>โจทย์</th><th>หมวด</th><th>คะแนน</th><th>ลำดับ</th><th></th></tr></thead>
-<tbody>
-{setItems.length === 0 && <tr><td colSpan={8}><div className="empty">ยังไม่มีข้อในชุดนี้</div></td></tr>}
-{setItems.map((row, i) => {
-const m = meta[row.item_id] || {};
-return (
-<tr key={row.id}>
-<td>{i + 1}</td>
-<td style={{ fontWeight: 700, color: "var(--accent)", whiteSpace: "nowrap" }}>#{row.item_id}</td>
-<td><span className={"pill " + (m.type || "mcq")}>{(m.type || "").toUpperCase()}</span></td>
-<td style={{ maxWidth: 320 }}>{(m.stem || "—").slice(0, 90)}</td>
-<td>{m.dom || "—"}{m.sub ? " → " + m.sub : ""}</td>
-<td><input type="number" step="0.5" value={row.points} onChange={(e) => setPoints(row, e.target.value)} style={{ width: 70 }} /></td>
-<td><div className="row" style={{ gap: 2 }}>
-<button className="btn ghost sm" disabled={i === 0} onClick={() => move(i, -1)}>↑</button>
-<button className="btn ghost sm" disabled={i >= setItems.length - 1} onClick={() => move(i, 1)}>↓</button>
-</div></td>
-<td><button className="btn ghost sm" onClick={() => removeItem(row)}>ลบ</button></td>
-</tr>
-);
-})}
-</tbody>
-</table>
-</div>
-</>
-)}
-</div>
-{picker && (
-<div className="overlay" onClick={(e) => e.target === e.currentTarget && setPicker(false)}>
-<div className="modal" style={{ maxWidth: 820 }}>
-<div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-<h3>เพิ่มข้อจากคลัง (เฉพาะข้อที่อนุมัติแล้ว)</h3>
-<button className="btn ghost sm" onClick={() => setPicker(false)}>ปิด</button>
-</div>
-<div className="filters">
-<div className="f"><label>ค้นหา</label><input value={pf.q} onChange={(e) => setPf({ ...pf, q: e.target.value })} placeholder="โจทย์ / หัวข้อย่อย" /></div>
-<div className="f"><label>หมวด</label><select value={pf.domain} onChange={(e) => setPf({ ...pf, domain: e.target.value })}><option value="">ทั้งหมด</option>{bp.domains.map((d) => <option key={d.code} value={d.code}>{d.code}</option>)}</select></div>
-<div className="f"><label>สาขา</label><select value={pf.spec} onChange={(e) => setPf({ ...pf, spec: e.target.value })}><option value="">ทั้งหมด</option>{bp.specs.map((s) => <option key={s.id} value={String(s.id)}>{s.name_th}</option>)}</select></div>
-<div className="f"><label>ชนิด</label><select value={pf.type} onChange={(e) => setPf({ ...pf, type: e.target.value })}><option value="">ทั้งหมด</option><option value="mcq">MCQ</option><option value="meq">MEQ</option></select></div>
-</div>
-<div className="tablewrap" style={{ maxHeight: "55vh", overflow: "auto" }}>
-<table>
-<thead><tr><th>เลขข้อ</th><th>ชนิด</th><th>โจทย์</th><th>หมวด</th><th>สาขา</th><th></th></tr></thead>
-<tbody>
-{poolFiltered.length === 0 && <tr><td colSpan={6}><div className="empty">ไม่พบข้อสอบที่อนุมัติในเงื่อนไขนี้</div></td></tr>}
-{poolFiltered.map((it) => (
-<tr key={it.id}>
-<td style={{ fontWeight: 700, color: "var(--accent)", whiteSpace: "nowrap" }}>#{it.id}</td>
-<td><span className={"pill " + it.type}>{it.type.toUpperCase()}</span></td>
-<td style={{ maxWidth: 340 }}>{(poolStems[it.current_version_id] || "—").slice(0, 90)}</td>
-<td>{it.nl_domain_code || "—"}{it.nl_subitem ? " → " + it.nl_subitem : ""}</td>
-<td>{specName(it.specialty_id)}</td>
-<td>{inSet(it.id) ? <span className="muted">เพิ่มแล้ว</span> : <button className="btn sm" onClick={() => addItem(it)}>เพิ่ม</button>}</td>
-</tr>
-))}
-</tbody>
-</table>
-</div>
-</div>
-</div>
-)}
-</div>
-);
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {BLOOM} from '../lib/constants';
+import {newBlueprint,coverage} from '../lib/blueprint.mjs';
+const statuses={draft:'ร่าง',ready:'พร้อมใช้',archived:'เก็บ'};
+const fields={specialty_id:'สาขาวิชา',nl_domain_code:'หมวด NL',physician_task:'ภารกิจแพทย์',bloom_level:'ระดับ Bloom'};
+export default function ExamSets({sb,bp,me,notify}){
+ const [kind,setKind]=useState('mcq'),[sets,setSets]=useState([]),[sel,setSel]=useState(null),[items,setItems]=useState([]),[pool,setPool]=useState([]);
+ const [name,setName]=useState(''),[plan,setPlan]=useState(newBlueprint),[dirty,setDirty]=useState(false),[step,setStep]=useState('plan'),[search,setSearch]=useState(''),[filter,setFilter]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const lock=useRef(false);
+ const run=async(fn)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{lock.current=false;setBusy(false);}};
+ const query=async(p)=>{const r=await p;if(r.error)throw Error(r.error.message);return r.data||[];};
+ const loadSets=useCallback(async()=>{const {data,error}=await sb.from('exam_sets').select('*').order('updated_at',{ascending:false});if(error)throw Error(error.message);setSets(data||[]);},[sb]);
+ useEffect(()=>{loadSets().catch(e=>setError(e.message));},[loadSets]);
+ useEffect(()=>{if(!dirty)return;const f=e=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',f);return()=>window.removeEventListener('beforeunload',f);},[dirty]);
+ const load=async(s)=>{
+  const table=s.kind==='meq'?'exam_set_cases':'exam_set_items';
+  const chosen=await query(sb.from(table).select('*').eq('exam_set_id',s.id).order('position'));
+  let available;
+  if(s.kind==='meq')available=await query(sb.from('meq_cases').select('id,title,document,academic_year').order('updated_at',{ascending:false}));
+  else {
+   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level').eq('type','mcq').order('updated_at',{ascending:false}));
+   const ids=available.map(x=>x.current_version_id).filter(Boolean);
+   const versions=ids.length?await query(sb.from('bank_item_versions').select('id,stem').in('id',ids)):[];
+   const stems=new Map(versions.map(v=>[v.id,v.stem]));available=available.map(x=>({...x,title:stems.get(x.current_version_id)||'ยังไม่มีโจทย์'}));
+  }
+  setPool(available);setItems(chosen.map(x=>({...x,detail:available.find(p=>String(p.id)===String(x.item_id||x.case_id))||{title:'ไม่พบข้อสอบหรือไม่มีสิทธิ์อ่าน'}})));
+ };
+ const open=async(s)=>{if(dirty){setError('กรุณาบันทึก Table of Specifications ก่อนเปลี่ยนชุด');return;}await load(s);setSel(s);setPlan(s.blueprint||newBlueprint());setStep(s.kind==='mcq'?'plan':'select');setSearch('');setFilter(null);};
+ const create=()=>run(async()=>{if(dirty)throw Error('บันทึกตารางของชุดปัจจุบันก่อน');if(!name.trim())throw Error('กรุณาตั้งชื่อชุดข้อสอบ');const r=await query(sb.from('exam_sets').insert({name:name.trim(),kind,blueprint:kind==='mcq'?newBlueprint():{},created_by:me}).select('*').single());await open(r);setName('');await loadSets();});
+ const save=async()=>{if(!stats.valid)throw Error('เพิ่มสัดส่วนอย่างน้อยหนึ่งช่อง เลือกหมวดให้ครบ จำนวนเป็นจำนวนเต็มมากกว่า 0 และไม่ซ้ำช่องเดิม');const result=await query(sb.from('exam_sets').update({blueprint:plan,status:'draft',updated_at:new Date().toISOString()}).eq('id',sel.id).select('*').single());setSel(result);setDirty(false);await loadSets();notify('บันทึกตารางแล้ว ข้อที่เลือกไว้ยังอยู่ครบ');};
+ const changePlan=p=>{setPlan(p);setDirty(true);setFilter(null);};
+ const mutate=fn=>run(async()=>{await fn();await load(sel);setSel(s=>({...s,status:'draft'}));await loadSets();});
+ const add=p=>mutate(async()=>{if(items.some(x=>String(x.item_id||x.case_id)===String(p.id)))return;await query(sb.from(kind==='mcq'?'exam_set_items':'exam_set_cases').insert({exam_set_id:sel.id,[kind==='mcq'?'item_id':'case_id']:p.id,position:items.length?Math.max(...items.map(x=>x.position))+1:1,...(kind==='mcq'?{points:1}:{})}));});
+ const remove=x=>mutate(()=>query(sb.from(kind==='mcq'?'exam_set_items':'exam_set_cases').delete().eq('id',x.id)));
+ const move=(i,dir)=>mutate(async()=>{const order=items.map(x=>x.id);[order[i],order[i+dir]]=[order[i+dir],order[i]];await query(sb.rpc('reorder_exam_set',{set_id:sel.id,ordered_ids:order}));});
+ const ready=()=>run(async()=>{if(dirty)throw Error('บันทึกตารางก่อนเปลี่ยนสถานะ');const updated=await query(sb.from('exam_sets').update({status:sel.status==='ready'?'draft':'ready',updated_at:new Date().toISOString()}).eq('id',sel.id).select('*').single());setSel(updated);await loadSets();});
+ const stats=coverage(plan,items.map(x=>x.detail));
+ const options=field=>field==='specialty_id'?(bp.specs||[]).map(x=>[String(x.id),x.name_th]):field==='nl_domain_code'?(bp.domains||[]).map(x=>[x.code,x.code+' '+(x.name||'')]):field==='physician_task'?(bp.tasks||[]).map(x=>[x.code,x.name]):BLOOM.map(x=>[x,x]);
+ const label=(field,value)=>options(field).find(x=>x[0]===value)?.[1]||value;
+ const totals=items.reduce((a,x)=>{for(const s of x.detail.document?.stages||[]){a.minutes+=Number(s.minutes)||0;a.stages++;for(const q of s.questions||[])a.points+=Number(q.points)||0;}return a;},{minutes:0,stages:0,points:0});
+ const available=pool.filter(p=>(kind==='meq'||p.status==='approved')&&p.title.toLowerCase().includes(search.toLowerCase())&&(!filter||(String(p[plan.rowField])===filter.row&&String(p[plan.columnField])===filter.column)));
+ return <div><header className="set-heading"><div><h1>สร้างชุดข้อสอบ</h1><p className="set-note">{kind==='mcq'?'กำหนดสัดส่วน → เลือกข้อสอบ → ตรวจความครบถ้วน':'เลือกเคส MEQ และเรียงลำดับการสอบ'}</p></div><div className="row" aria-label="ประเภทชุดข้อสอบ">{['mcq','meq'].map(k=><button key={k} className={'btn '+(kind===k?'':'ghost')} aria-pressed={kind===k} disabled={busy} onClick={()=>{if(dirty){setError('บันทึกตารางก่อนเปลี่ยนประเภท');return;}setKind(k);setSel(null);setItems([]);setError('');}}>{k.toUpperCase()}</button>)}</div></header>
+ {error&&<p className="delivery-alert" role="alert">{error}</p>}
+ <div className="set-workspace"><aside><form className="card set-panel" onSubmit={e=>{e.preventDefault();create();}}><label>ชื่อชุด {kind.toUpperCase()} ใหม่<input value={name} onChange={e=>setName(e.target.value)} required maxLength={300}/></label><button className="btn" disabled={busy} style={{marginTop:12}}>สร้างชุด {kind.toUpperCase()}</button></form><h3>ชุด {kind.toUpperCase()}</h3>{sets.filter(s=>s.kind===kind).map(s=><button disabled={busy} className={'th-li'+(sel?.id===s.id?' active':'')} key={s.id} onClick={()=>run(()=>open(s))}><span className="th-txt">{s.name}</span><span className={'pill '+(s.status==='ready'?'approved':'draft')}>{statuses[s.status]}</span></button>)}{!sets.some(s=>s.kind===kind)&&<p className="muted">ยังไม่มีชุดข้อสอบประเภทนี้</p>}</aside>
+ <section className="card set-panel">{!sel?<div className="empty"><h2>{kind==='mcq'?'เริ่มจาก Table of Specifications':'จัดชุดข้อสอบ MEQ'}</h2><p>{kind==='mcq'?'ตั้งชื่อชุด แล้วกำหนดจำนวนข้อในแต่ละหมวดก่อนเลือกข้อจากคลัง':'ตั้งชื่อชุด แล้วเลือกเคสจากคลัง MEQ แต่ละเคสคงลำดับตอนและเกณฑ์คะแนนของตนเอง'}</p></div>:<><div className="set-heading"><h2>{sel.name}</h2><span className={'pill '+(sel.status==='ready'?'approved':'draft')}>{statuses[sel.status]}</span></div>
+ <div className="set-steps">{(kind==='mcq'?[['plan','1. Table of Specifications'],['select','2. เลือกข้อสอบ'],['review','3. ตรวจชุดข้อสอบ']]:[['select','1. เลือกเคส MEQ'],['review','2. ตรวจชุดข้อสอบ']]).map(([key,title])=><button key={key} className="btn ghost" aria-pressed={step===key} disabled={busy||(kind==='mcq'&&key!=='plan'&&!sel.blueprint?.cells?.length)} onClick={()=>setStep(key)}>{title}</button>)}</div>
+ <div className="set-progress"><div><strong>{items.length}</strong>{kind==='mcq'?'ข้อที่เลือก':'เคสที่เลือก'}</div>{kind==='mcq'?<><div><strong>{stats.target}</strong>เป้าหมายตามตาราง</div><div><strong>{items.reduce((n,x)=>n+Number(x.points||0),0)}</strong>คะแนนรวม</div></>:<><div><strong>{totals.stages}</strong>ตอน</div><div><strong>{totals.minutes}</strong>นาที</div><div><strong>{totals.points}</strong>คะแนน</div></>}</div>
+ {step==='plan'&&kind==='mcq'&&<><p className="set-note">หนึ่งแถวคือหนึ่งช่องของตาราง แก้สัดส่วนและกลับมาเพิ่มข้อได้ตลอด ข้อที่เลือกไว้จะไม่ถูกลบ การแก้ตารางจะเปลี่ยนชุดกลับเป็นร่าง</p><fieldset disabled={busy}><div className="grid2">{[['rowField','แกนเนื้อหา'],['columnField','แกนสมรรถนะ']].map(([key,title])=><label key={key}>{title}<select value={plan[key]} onChange={e=>changePlan({...plan,[key]:e.target.value,cells:plan.cells.map(c=>({...c,[key==='rowField'?'row':'column']:''}))})}>{Object.entries(fields).filter(([f])=>f!==plan[key==='rowField'?'columnField':'rowField']).map(([f,l])=><option key={f} value={f}>{l}</option>)}</select></label>)}</div><div className="tablewrap set-tos"><table><thead><tr><th>{fields[plan.rowField]}</th><th>{fields[plan.columnField]}</th><th>เป้าหมาย</th><th>เลือกแล้ว</th><th>ขาด / เกิน</th><th/></tr></thead><tbody>{stats.cells.map((c,i)=><tr key={i}>{['row','column'].map((axis)=><td key={axis}><select aria-label={`${axis==='row'?'เนื้อหา':'สมรรถนะ'} แถว ${i+1}`} value={c[axis]} onChange={e=>changePlan({...plan,cells:plan.cells.map((x,j)=>j===i?{...x,[axis]:e.target.value}:x)})}><option value="">เลือก</option>{options(plan[axis==='row'?'rowField':'columnField']).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></td>)}<td><input aria-label={`จำนวนเป้าหมาย แถว ${i+1}`} type="number" min="1" step="1" value={c.target} onChange={e=>changePlan({...plan,cells:plan.cells.map((x,j)=>j===i?{...x,target:Number(e.target.value)}:x)})}/></td><td>{c.actual}</td><td>{c.actual===c.target?'ครบ':c.actual<c.target?`ขาด ${c.target-c.actual}`:`เกิน ${c.actual-c.target}`}</td><td><button className="btn ghost sm" aria-label={`ลบสัดส่วนแถว ${i+1}`} onClick={()=>changePlan({...plan,cells:plan.cells.filter((_,j)=>j!==i)})}>ลบ</button></td></tr>)}</tbody></table></div><div className="set-actions"><button className="btn ghost" onClick={()=>changePlan({...plan,cells:[...plan.cells,{row:'',column:'',target:1}]})}>เพิ่มสัดส่วน</button><button className="btn" onClick={()=>run(save)}>บันทึกตาราง{dirty?' *':''}</button><button className="btn ghost" disabled={!sel.blueprint?.cells?.length||dirty} onClick={()=>setStep('select')}>ไปเลือกข้อสอบ →</button></div></fieldset></>}
+ {step!=='plan'&&<><h3>{step==='review'?'ข้อสอบในชุด':'เลือกไว้แล้ว'}</h3>{!items.length?<p className="empty">ยังไม่ได้เลือก{kind==='mcq'?'ข้อสอบ':'เคส'}</p>:<div className="tablewrap"><table><thead><tr><th>ลำดับ</th><th>{kind==='mcq'?'โจทย์':'เคส MEQ'}</th><th>คะแนน</th><th>จัดลำดับ</th><th/></tr></thead><tbody>{items.map((x,i)=><tr key={x.id}><td>{i+1}</td><td>{x.detail.title.slice(0,160)}</td><td>{kind==='mcq'?<input aria-label={`คะแนนข้อ ${i+1}`} style={{width:75}} type="number" min="0.5" step="0.5" defaultValue={x.points} key={`${x.id}-${x.points}`} disabled={busy} onBlur={e=>{const p=Number(e.target.value);if(p!==Number(x.points))mutate(async()=>{if(!Number.isFinite(p)||p<=0)throw Error('คะแนนต้องมากกว่า 0');await query(sb.from('exam_set_items').update({points:p}).eq('id',x.id));});}}/>:(x.detail.document?.stages||[]).reduce((n,s)=>n+(s.questions||[]).reduce((v,q)=>v+Number(q.points||0),0),0)}</td><td><div className="row"><button className="btn ghost sm" aria-label={`เลื่อนข้อ ${i+1} ขึ้น`} disabled={busy||i===0} onClick={()=>move(i,-1)}>↑</button><button className="btn ghost sm" aria-label={`เลื่อนข้อ ${i+1} ลง`} disabled={busy||i===items.length-1} onClick={()=>move(i,1)}>↓</button></div></td><td><button className="btn ghost sm" disabled={busy} onClick={()=>remove(x)}>นำออก</button></td></tr>)}</tbody></table></div>}
+ {kind==='mcq'&&<><h3>ความครบถ้วนตามตาราง{dirty?' (ยังไม่บันทึก)':''}</h3>{stats.cells.map((c,i)=><p key={i}>{label(plan.rowField,c.row)} · {label(plan.columnField,c.column)} — {c.actual}/{c.target} ข้อ {c.actual<c.target&&<button disabled={busy} className="btn ghost sm" onClick={()=>{setFilter(c);setStep('select');}}>เลือกเพิ่ม {c.target-c.actual} ข้อ</button>}{c.actual>c.target&&` · เกิน ${c.actual-c.target} ข้อ`}</p>)}{!!stats.unmatched&&<p role="status">มี {stats.unmatched} ข้อนอกตาราง ให้ปรับสัดส่วนหรือนำข้อออกก่อนพร้อมใช้</p>}</>}
+ {step==='select'&&<section className="set-picker"><div className="set-heading"><h3>เพิ่มจากคลัง {kind.toUpperCase()}</h3><button className="btn ghost sm" disabled={busy} onClick={()=>run(()=>load(sel))}>รีเฟรชคลัง</button></div><label>ค้นหา{kind==='mcq'?'โจทย์ที่อนุมัติแล้ว':'ชื่อเคส'}<input value={search} onChange={e=>setSearch(e.target.value)}/></label>{filter&&<p>เฉพาะ {label(plan.rowField,filter.row)} · {label(plan.columnField,filter.column)} <button className="btn ghost sm" onClick={()=>setFilter(null)}>แสดงทั้งหมด</button></p>}{!available.length&&<p className="empty">ยังไม่มี{kind==='mcq'?'ข้อสอบที่อนุมัติ':'เคส'}ตามเงื่อนไขนี้</p>}{available.map(p=><article key={p.id}><div><p>{p.title.slice(0,240)}</p>{kind==='meq'&&<small>{p.document?.stages?.length||0} ตอน · ปีการศึกษา {p.academic_year}</small>}</div><button className="btn ghost sm" disabled={busy||items.some(x=>String(x.item_id||x.case_id)===String(p.id))} onClick={()=>add(p)}>{items.some(x=>String(x.item_id||x.case_id)===String(p.id))?'เลือกแล้ว':'เพิ่ม'}</button></article>)}</section>}
+ <div className="set-actions">{kind==='mcq'&&<button className="btn ghost" onClick={()=>setStep('plan')}>← แก้ Table of Specifications</button>}{step==='select'?<button className="btn" onClick={()=>setStep('review')}>ตรวจชุดข้อสอบ →</button>:<><button className="btn ghost" onClick={()=>setStep('select')}>กลับไปเพิ่มข้อสอบ</button><button className="btn" disabled={busy||dirty||(!items.length)||(kind==='mcq'&&!stats.complete&&sel.status!=='ready')} onClick={ready}>{sel.status==='ready'?'เปลี่ยนกลับเป็นร่าง':'ยืนยันพร้อมใช้'}</button></>}</div></>}
+ </>}</section></div></div>;
 }

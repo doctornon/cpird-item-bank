@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
+import StaffShell from "./StaffShell";
 import Dashboard from "./Dashboard";
 import Bank from "./Bank";
 import MeqBank from "./MeqBank";
@@ -71,36 +72,18 @@ return (
 if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
-<div className="topbar"><div className="wrap in">
-<span className="brand">คลังข้อสอบ CPIRD</span>
-<div className="tabs">
-<button className="tab" onClick={() => setTab("take")}>โหมดทำข้อสอบ</button>
-<button className={"tab" + (tab === "dashboard" ? " active" : "")} onClick={() => setTab("dashboard")}>แดชบอร์ด</button>
-<button className={"tab" + (tab === "bank" ? " active" : "")} onClick={() => setTab("bank")}>คลัง MCQ</button>
-<button className={"tab" + (tab === "meq" ? " active" : "")} onClick={() => setTab("meq")}>คลัง MEQ</button>
-{canApprove && <button className={"tab" + (tab === "sets" ? " active" : "")} onClick={() => setTab("sets")}>สร้างชุดข้อสอบ</button>}
-{canApprove && <button className={"tab" + (tab === "assign" ? " active" : "")} onClick={() => setTab("assign")}>มอบหมายสอบ</button>}
-{canApprove && <button className={"tab" + (tab === "theater" ? " active" : "")} onClick={() => setTab("theater")}>วิพากษ์ข้อสอบ</button>}
-{canWrite && <button className={"tab" + (tab === "import" ? " active" : "")} onClick={() => setTab("import")}>นำเข้า Excel</button>}
-{superAdmin && <button className={"tab" + (tab === "roles" ? " active" : "")} onClick={() => setTab("roles")}>จัดการสิทธิ์</button>}
-</div>
-<span className="grow" />
-<span className="who">
-{profile?.full_name || profile?.email}<br />
-<span className="muted">{superAdmin ? "admin" : roles.join(", ") || "ผู้ใช้"}</span>
-</span>
-<button className="btn ghost sm" onClick={() => sb.auth.signOut()}>ออก</button>
-</div></div>
-<div className="wrap section">
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} onSignOut={() => sb.auth.signOut()}>
+<div className="section">
 {tab === "dashboard" && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "meq" && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
-{tab === "sets" && canApprove && <ExamSets sb={sb} bp={bp} me={me} notify={notify} />}
+{canApprove && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}
 </div>
+</StaffShell>
 {toast && <div className="toast">{toast}</div>}
 </>
 );
