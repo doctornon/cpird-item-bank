@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {BLOOM} from '../lib/constants';
 import {newBlueprint,coverage} from '../lib/blueprint.mjs';
-import {SPEC_VERSIONS,TOS,scaledTargets} from '../lib/tos.mjs';
+import {SPEC_VERSIONS,TOS,scaledTargets,ICD_SYSTEMS} from '../lib/tos.mjs';
 import Heat from './Heat';
 const statuses={draft:'ร่าง',ready:'พร้อมใช้',archived:'เก็บ'};
 const fields={specialty_id:'สาขาวิชา',nl_domain_code:'หมวด NL',physician_task:'ภารกิจแพทย์',bloom_level:'ระดับ Bloom'};
@@ -13,6 +13,8 @@ export default function ExamSets({sb,bp,me,notify}){
  const [creating,setCreating]=useState(false);
  const [renaming,setRenaming]=useState(false),[editName,setEditName]=useState(''),[editDesc,setEditDesc]=useState('');
  const [covScope,setCovScope]=useState('set');
+ const [qmap,setQmap]=useState({});
+ const [pickIcd,setPickIcd]=useState('');
  const run=async(fn)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{lock.current=false;setBusy(false);}};
  const query=async(p)=>{const r=await p;if(r.error)throw Error(r.error.message);return r.data||[];};
  const loadSets=useCallback(async()=>{const {data,error}=await sb.from('exam_sets').select('*').order('updated_at',{ascending:false});if(error)throw Error(error.message);setSets(data||[]);},[sb]);
@@ -24,10 +26,13 @@ export default function ExamSets({sb,bp,me,notify}){
   let available;
   if(s.kind==='meq')available=await query(sb.from('meq_cases').select('id,title,document,academic_year').order('updated_at',{ascending:false}));
   else {
-   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level,icd_system,nl_group').eq('type','mcq').order('updated_at',{ascending:false}));
+   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level,icd_system,nl_group,use_count').eq('type','mcq').order('updated_at',{ascending:false}));
    const ids=available.map(x=>x.current_version_id).filter(Boolean);
    const versions=ids.length?await query(sb.from('bank_item_versions').select('id,stem').in('id',ids)):[];
    const stems=new Map(versions.map(v=>[v.id,v.stem]));available=available.map(x=>({...x,title:stems.get(x.current_version_id)||'ยังไม่มีโจทย์'}));
+   const aids=available.map(x=>x.id);
+   const st=aids.length?await query(sb.from('bank_item_stats').select('item_id,p_value,discrimination,n,computed_at').in('item_id',aids).order('computed_at',{ascending:false})):[];
+   const qm={};st.forEach(s=>{if(!qm[s.item_id])qm[s.item_id]=s;});setQmap(qm);
   }
   setPool(available);setItems(chosen.map(x=>({...x,detail:available.find(p=>String(p.id)===String(x.item_id||x.case_id))||{title:'ไม่พบข้อสอบหรือไม่มีสิทธิ์อ่าน'}})));
  };
@@ -50,6 +55,26 @@ export default function ExamSets({sb,bp,me,notify}){
  const spec=sel&&sel.spec_version?scaledTargets(sel.spec_version,sel.target_count):null;
  const setIcd={};
  if(spec)items.forEach(x=>{const c=x.detail&&x.detail.icd_system;if(c)setIcd[c]=(setIcd[c]||0)+1;});
+ // magic selection quality signals
+ const usedBefore=(p)=>!!qmap[p.id]||p.use_count>0;
+ const isGood=(p)=>{const s=qmap[p.id];if(!s)return true;if(s.discrimination!=null&&s.discrimination<0.15)return false;if(s.p_value!=null&&(s.p_value<0.2||s.p_value>0.9))return false;return true;};
+ const rec=(p)=>{const used=usedBefore(p),good=isGood(p);if(used&&!good)return{tag:'ควรปรับปรุง',cls:'gap-short'};if(used&&good)return{tag:'เคยใช้ · ทำ parallel',cls:'gap-over'};return{tag:'ยังไม่เคยใช้ · ใช้ได้เลย',cls:'gap-ok'};};
+ const qscore=(p)=>usedBefore(p)?(isGood(p)?1:0):2;
+ const magicFill=(icdCode,need)=>mutate(async()=>{
+  const have=new Set(items.map(x=>String(x.item_id)));
+  const cands=pool.filter(p=>p.status==='approved'&&p.icd_system===icdCode&&!have.has(String(p.id)));
+  if(!cands.length)throw Error('ไม่มีข้อในคลังสำหรับระบบนี้ — แนะนำให้ออกข้อใหม่');
+  const ranked=[...cands].sort((a,b)=>qscore(b)-qscore(a)).slice(0,need);
+  const base=items.length?Math.max(...items.map(x=>x.position)):0;
+  await query(sb.from('exam_set_items').insert(ranked.map((p,i)=>({exam_set_id:sel.id,item_id:p.id,position:base+i+1,points:1}))));
+  notify('เติม '+ranked.length+' ข้ออัตโนมัติ'+(ranked.length<need?(' — ยังขาดอีก '+(need-ranked.length)+' ข้อ ควรออกใหม่'):''));
+ });
+ const props2569=spec&&sel.spec_version==='2569'?TOS['2569'].taskProps:null;
+ const taskGap=props2569?[['dx','วินิจฉัย'],['labs','ตรวจทางห้องปฏิบัติการ'],['tx','รักษา'],['patho','พยาธิกำเนิด'],['prognosis','พยากรณ์โรค']].map(([code,label])=>{
+  const target=Math.round(spec.group1.target*props2569.group1[code]+spec.diseaseTotal*props2569.group23[code]);
+  const actual=items.filter(x=>x.detail&&x.detail.physician_task===code).length;
+  return{code,label,target,actual,diff:actual-target};
+ }):null;
  const covSource=covScope==='set'?items.map(x=>x.detail):pool;
  const cby=(pred)=>covSource.filter(pred).length;
  const covTask=bp.domains.map(d=>bp.tasks.map(t=>cby(i=>i.nl_domain_code===d.code&&i.physician_task===t.code)));
@@ -58,7 +83,7 @@ export default function ExamSets({sb,bp,me,notify}){
  const options=field=>field==='specialty_id'?(bp.specs||[]).map(x=>[String(x.id),x.name_th]):field==='nl_domain_code'?(bp.domains||[]).map(x=>[x.code,x.code+' '+(x.name||'')]):field==='physician_task'?(bp.tasks||[]).map(x=>[x.code,x.name]):BLOOM.map(x=>[x,x]);
  const label=(field,value)=>options(field).find(x=>x[0]===value)?.[1]||value;
  const totals=items.reduce((a,x)=>{for(const s of x.detail.document?.stages||[]){a.minutes+=Number(s.minutes)||0;a.stages++;for(const q of s.questions||[])a.points+=Number(q.points)||0;}return a;},{minutes:0,stages:0,points:0});
- const available=pool.filter(p=>(kind==='meq'||p.status==='approved')&&p.title.toLowerCase().includes(search.toLowerCase())&&(!filter||(String(p[plan.rowField])===filter.row&&String(p[plan.columnField])===filter.column)));
+ const available=pool.filter(p=>(kind==='meq'||p.status==='approved')&&p.title.toLowerCase().includes(search.toLowerCase())&&(!filter||(String(p[plan.rowField])===filter.row&&String(p[plan.columnField])===filter.column))&&(!pickIcd||String(p.icd_system)===pickIcd));
  return <div><header className="set-heading"><div><h1>สร้างชุดข้อสอบ</h1><p className="set-note">{kind==='mcq'?'กำหนดสัดส่วน → เลือกข้อสอบ → ตรวจความครบถ้วน':'เลือกเคส MEQ และเรียงลำดับการสอบ'}</p></div><div className="row" aria-label="ประเภทชุดข้อสอบ">{['mcq','meq'].map(k=><button key={k} className={'btn '+(kind===k?'':'ghost')} aria-pressed={kind===k} disabled={busy} onClick={()=>{if(dirty){setError('บันทึกตารางก่อนเปลี่ยนประเภท');return;}setKind(k);setSel(null);setItems([]);setError('');}}>{k.toUpperCase()}</button>)}</div></header>
  {error&&<p className="delivery-alert" role="alert">{error}</p>}
  <div className="set-workspace"><aside className="set-library" aria-label="เลือกหรือสร้างชุดข้อสอบ">
@@ -76,10 +101,14 @@ export default function ExamSets({sb,bp,me,notify}){
  </div>
  {spec&&<>
  <p className="set-note">{spec.note} · ฐาน {spec.total} ข้อ → ปรับเป็น {spec.N} ข้อ (หมวด1 ทั่วไป {spec.category1.target} · ฉุกเฉิน {spec.group1.target} · โรคตามระบบ {spec.diseaseTotal})</p>
- <div className="tablewrap"><table><thead><tr><th>ระบบโรค (ICD)</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th></tr></thead><tbody>
- {spec.systems.filter(s=>s.target>0||setIcd[s.code]).map(s=>{const a=setIcd[s.code]||0;const d=a-s.target;return <tr key={s.code}><td title={s.th}>{s.roman}. {s.th}</td><td>{s.target}</td><td>{a}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td></tr>;})}
+ <div className="tablewrap"><table><thead><tr><th>ระบบโรค (ICD)</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th><th>เติมอัตโนมัติ (magic)</th></tr></thead><tbody>
+ {spec.systems.filter(s=>s.target>0||setIcd[s.code]).map(s=>{const a=setIcd[s.code]||0;const d=a-s.target;const avail=pool.filter(p=>p.status==='approved'&&p.icd_system===s.code&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr key={s.code}><td title={s.th}>{s.roman}. {s.th}</td><td>{s.target}</td><td>{a}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>magicFill(s.code,-d)}>✨ เติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})}
  </tbody></table></div>
- <p className="set-note">* เทียบระดับ “ระบบโรค” (รวมกลุ่ม 2+3) — การจัด ICD ของข้อเดิมเป็นแบบอัตโนมัติ ควรให้กรรมการรีวิว; การแยกกลุ่ม 1/2/3 และภารกิจแพทย์จะเพิ่มในเฟสถัดไป</p>
+ {taskGap&&<><div className="mk" style={{margin:'12px 0 6px'}}>สัดส่วนตามภารกิจแพทย์ (เกณฑ์ 2569)</div>
+ <div className="tablewrap"><table><thead><tr><th>ภารกิจ</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th></tr></thead><tbody>
+ {taskGap.map(t=><tr key={t.code}><td>{t.label}</td><td>{t.target}</td><td>{t.actual}</td><td className={t.diff<0?'gap-short':t.diff>0?'gap-over':'gap-ok'}>{t.diff===0?'ครบ':t.diff<0?('ขาด '+(-t.diff)):('เกิน '+t.diff)}</td></tr>)}
+ </tbody></table></div></>}
+ <p className="set-note">* เทียบระดับ “ระบบโรค” (รวมกลุ่ม 2+3) — ✨ เติมอัตโนมัติจะเลือกข้อที่อนุมัติแล้ว โดยให้ข้อที่ยังไม่เคยใช้ก่อน แล้วข้อเก่าคุณภาพดี; ที่ไม่พอให้ออกใหม่ · การจัด ICD ของข้อเดิมเป็นแบบอัตโนมัติ ควรให้กรรมการรีวิว · การแยกกลุ่ม 1/2/3 ต้องใช้รายชื่อโรคทางการของ ศรว.</p>
  </>}
  </section>}
  {step==='plan'&&kind==='mcq'&&<><p className="set-note">หนึ่งแถวคือหนึ่งช่องของตาราง แก้สัดส่วนและกลับมาเพิ่มข้อได้ตลอด ข้อที่เลือกไว้จะไม่ถูกลบ การแก้ตารางจะเปลี่ยนชุดกลับเป็นร่าง</p><fieldset disabled={busy}><div className="grid2">{[['rowField','แกนเนื้อหา'],['columnField','แกนสมรรถนะ']].map(([key,title])=><label key={key}>{title}<select value={plan[key]} onChange={e=>changePlan({...plan,[key]:e.target.value,cells:plan.cells.map(c=>({...c,[key==='rowField'?'row':'column']:''}))})}>{Object.entries(fields).filter(([f])=>f!==plan[key==='rowField'?'columnField':'rowField']).map(([f,l])=><option key={f} value={f}>{l}</option>)}</select></label>)}</div><div className="tablewrap set-tos"><table><thead><tr><th>{fields[plan.rowField]}</th><th>{fields[plan.columnField]}</th><th>เป้าหมาย</th><th>เลือกแล้ว</th><th>ขาด / เกิน</th><th/></tr></thead><tbody>{stats.cells.map((c,i)=><tr key={i}>{['row','column'].map((axis)=><td key={axis}><select aria-label={`${axis==='row'?'เนื้อหา':'สมรรถนะ'} แถว ${i+1}`} value={c[axis]} onChange={e=>changePlan({...plan,cells:plan.cells.map((x,j)=>j===i?{...x,[axis]:e.target.value}:x)})}><option value="">เลือก</option>{options(plan[axis==='row'?'rowField':'columnField']).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></td>)}<td><input aria-label={`จำนวนเป้าหมาย แถว ${i+1}`} type="number" min="1" step="1" value={c.target} onChange={e=>changePlan({...plan,cells:plan.cells.map((x,j)=>j===i?{...x,target:Number(e.target.value)}:x)})}/></td><td>{c.actual}</td><td>{c.actual===c.target?'ครบ':c.actual<c.target?`ขาด ${c.target-c.actual}`:`เกิน ${c.actual-c.target}`}</td><td><button className="btn ghost sm" aria-label={`ลบสัดส่วนแถว ${i+1}`} onClick={()=>changePlan({...plan,cells:plan.cells.filter((_,j)=>j!==i)})}>ลบ</button></td></tr>)}</tbody></table></div><div className="set-actions"><button className="btn ghost" onClick={()=>changePlan({...plan,cells:[...plan.cells,{row:'',column:'',target:1}]})}>เพิ่มสัดส่วน</button><button className="btn" onClick={()=>run(save)}>บันทึกตาราง{dirty?' *':''}</button><button className="btn ghost" disabled={!sel.blueprint?.cells?.length||dirty} onClick={()=>setStep('select')}>ไปเลือกข้อสอบ →</button></div></fieldset></>}
@@ -91,7 +120,7 @@ export default function ExamSets({sb,bp,me,notify}){
  <div className="mk" style={{margin:'16px 0 6px'}}>หมวด NL × สาขา</div>
  {covSpecs.length===0?<p className="empty">{covScope==='set'?'ยังไม่มีข้อในชุดที่ระบุสาขา':'ยังไม่มีข้อสอบที่ระบุสาขา'}</p>:<div className="tablewrap" style={{boxShadow:'none'}}><Heat cols={{axis:'สาขา',items:covSpecs.map(s=>({label:(s.name_th||'').slice(0,10),title:s.name_th}))}} rows={bp.domains.map(d=>({label:d.code,title:d.title}))} matrix={covSpec}/></div>}
  </section>}
- {step==='select'&&<section className="set-picker"><div className="set-heading"><h3>เพิ่มจากคลัง {kind.toUpperCase()}</h3><button className="btn ghost sm" disabled={busy} onClick={()=>run(()=>load(sel))}>รีเฟรชคลัง</button></div><label>ค้นหา{kind==='mcq'?'โจทย์ที่อนุมัติแล้ว':'ชื่อเคส'}<input value={search} onChange={e=>setSearch(e.target.value)}/></label>{filter&&<p>เฉพาะ {label(plan.rowField,filter.row)} · {label(plan.columnField,filter.column)} <button className="btn ghost sm" onClick={()=>setFilter(null)}>แสดงทั้งหมด</button></p>}{!available.length&&<p className="empty">ยังไม่มี{kind==='mcq'?'ข้อสอบที่อนุมัติ':'เคส'}ตามเงื่อนไขนี้</p>}{available.map(p=><article key={p.id}><div><p>{p.title.slice(0,240)}</p>{kind==='meq'&&<small>{p.document?.stages?.length||0} ตอน · ปีการศึกษา {p.academic_year}</small>}</div><button className="btn ghost sm" disabled={busy||items.some(x=>String(x.item_id||x.case_id)===String(p.id))} onClick={()=>add(p)}>{items.some(x=>String(x.item_id||x.case_id)===String(p.id))?'เลือกแล้ว':'เพิ่ม'}</button></article>)}</section>}
+ {step==='select'&&<section className="set-picker"><div className="set-heading"><h3>เพิ่มจากคลัง {kind.toUpperCase()}</h3><button className="btn ghost sm" disabled={busy} onClick={()=>run(()=>load(sel))}>รีเฟรชคลัง</button></div><label>ค้นหา{kind==='mcq'?'โจทย์ที่อนุมัติแล้ว':'ชื่อเคส'}<input value={search} onChange={e=>setSearch(e.target.value)}/></label>{kind==='mcq'&&<label>กรองตามระบบโรค (ICD)<select value={pickIcd} onChange={e=>setPickIcd(e.target.value)}><option value="">ทุกระบบ</option>{ICD_SYSTEMS.map(s=><option key={s.code} value={String(s.code)}>{s.roman}. {s.th}</option>)}</select></label>}{filter&&<p>เฉพาะ {label(plan.rowField,filter.row)} · {label(plan.columnField,filter.column)} <button className="btn ghost sm" onClick={()=>setFilter(null)}>แสดงทั้งหมด</button></p>}{!available.length&&<p className="empty">ยังไม่มี{kind==='mcq'?'ข้อสอบที่อนุมัติ':'เคส'}ตามเงื่อนไขนี้{kind==='mcq'&&pickIcd?' — แนะนำให้ออกข้อใหม่ในระบบนี้':''}</p>}{available.map(p=>{const chosen=items.some(x=>String(x.item_id||x.case_id)===String(p.id));const r=kind==='mcq'?rec(p):null;return <article key={p.id}><div><p>{p.title.slice(0,240)}</p>{kind==='meq'?<small>{p.document?.stages?.length||0} ตอน · ปีการศึกษา {p.academic_year}</small>:<small className={r.cls}>{p.icd_system?(ICD_SYSTEMS.find(s=>s.code===p.icd_system)?.roman+' · '):''}{r.tag}</small>}</div><button className="btn ghost sm" disabled={busy||chosen} onClick={()=>add(p)}>{chosen?'เลือกแล้ว':'เพิ่ม'}</button></article>;})}</section>}
  <div className="set-actions">{kind==='mcq'&&<button className="btn ghost" onClick={()=>setStep('plan')}>← แก้ Table of Specifications</button>}{step==='select'?<button className="btn" onClick={()=>setStep('review')}>ตรวจชุดข้อสอบ →</button>:<><button className="btn ghost" onClick={()=>setStep('select')}>กลับไปเพิ่มข้อสอบ</button><button className="btn" disabled={busy||dirty||(!items.length)||(kind==='mcq'&&!stats.complete&&sel.status!=='ready')} onClick={ready}>{sel.status==='ready'?'เปลี่ยนกลับเป็นร่าง':'ยืนยันพร้อมใช้'}</button></>}</div></>}
  </>}</section></div></div>;
 }
