@@ -12,7 +12,7 @@ export default function DeliveryPortal({sb,profile,onExit,onSignOut}) {
  const [busy,setBusy]=useState(false),[operation,setOperation]=useState(''),[pending,setPending]=useState(0),[seconds,setSeconds]=useState(0),[sync,setSync]=useState('');
  const [blurN,setBlurN]=useState(0),[awayS,setAwayS]=useState(0),[showCert,setShowCert]=useState(false);
  const hiddenAt=useRef(0);
- const current=useRef(null),patch=useRef({}),flagState=useRef({}),flight=useRef(false),offset=useRef(0),retryAt=useRef(0),flagDirty=useRef(false);
+ const current=useRef(null),patch=useRef({}),flagState=useRef({}),visitedRef=useRef({}),flight=useRef(false),offset=useRef(0),retryAt=useRef(0),flagDirty=useRef(false);
  const storageKey=id=>`cpird_delivery_${id}`;
  const rpc=useCallback(async(action,payload={})=>{
   const {data,error}=await sb.rpc('delivery_run',{action,payload});
@@ -24,14 +24,14 @@ export default function DeliveryPortal({sb,profile,onExit,onSignOut}) {
  useEffect(()=>{load();},[load]);
  const persist=()=>{
   if(!current.current)return;
-  try{localStorage.setItem(storageKey(current.current.id),JSON.stringify({revision:current.current.revision,stage:current.current.stage,answers:patch.current,flags:flagState.current}));}
+  try{localStorage.setItem(storageKey(current.current.id),JSON.stringify({revision:current.current.revision,stage:current.current.stage,answers:patch.current,flags:flagState.current,visited:visitedRef.current}));}
   catch{setSync('พื้นที่ในเครื่องไม่พร้อม กรุณารอให้บันทึกบนเซิร์ฟเวอร์สำเร็จก่อนออก');}
  };
  const accept=(data,{restore=false,sent={}}={})=>{
   const previous=current.current;
   if(previous && previous.id===data.id && previous.stage!==data.stage){
    if(Object.keys(patch.current).some(k=>patch.current[k]!==sent[k])) setError('ตอนก่อนหน้าถูกล็อกแล้ว คำตอบที่ส่งไม่ทันเวลาจะไม่ถูกนับ');
-   patch.current={};setIndex(0);setReview(false);
+   patch.current={};visitedRef.current={};setVisited({});setIndex(0);setReview(false);
   }else{
    for(const [key,value] of Object.entries(sent)) if(patch.current[key]===value)delete patch.current[key];
   }
@@ -39,12 +39,12 @@ export default function DeliveryPortal({sb,profile,onExit,onSignOut}) {
    patch.current={};
    try{
     const backup=JSON.parse(localStorage.getItem(storageKey(data.id))||'null');
-    if(backup && backup.revision===data.revision && backup.stage===data.stage){patch.current=backup.answers||{};flagState.current=backup.flags||data.flags||{};}
-    else {flagState.current=data.flags||{};if(backup&&Object.keys(backup.answers||{}).length)setError('พบคำตอบค้างจากข้อมูลรุ่นเก่า ระบบใช้คำตอบล่าสุดบนเซิร์ฟเวอร์เพื่อไม่เขียนทับการสอบจากอีกแท็บ');}
-   }catch{flagState.current=data.flags||{};}
+    if(backup && backup.revision===data.revision && backup.stage===data.stage){patch.current=backup.answers||{};flagState.current=backup.flags||data.flags||{};visitedRef.current=backup.visited||{};}
+    else {flagState.current=data.flags||{};visitedRef.current={};if(backup&&Object.keys(backup.answers||{}).length)setError('พบคำตอบค้างจากข้อมูลรุ่นเก่า ระบบใช้คำตอบล่าสุดบนเซิร์ฟเวอร์เพื่อไม่เขียนทับการสอบจากอีกแท็บ');}
+   }catch{flagState.current=data.flags||{};visitedRef.current={};}
   }
   current.current=data;offset.current=new Date(data.server_now).getTime()-Date.now();
-  setAttempt(data);setAnswers({...data.answers,...patch.current});setFlags({...flagState.current});setPending(Object.keys(patch.current).length);
+  setAttempt(data);setAnswers({...data.answers,...patch.current});setFlags({...flagState.current});setVisited({...visitedRef.current});setPending(Object.keys(patch.current).length);
   if(data.status!=='in_progress'){
    patch.current={};setReview(false);setPending(0);try{localStorage.removeItem(storageKey(data.id));}catch{}
   }else persist();
@@ -94,7 +94,7 @@ export default function DeliveryPortal({sb,profile,onExit,onSignOut}) {
  },[attempt?.id,attempt?.status,attempt?.proctor_blur,sb]);
  const start=async(a)=>{
   if(flight.current)return;flight.current=true;setBusy(true);setError('');
-  try{const data=await rpc('start',{id:a.id,code});accept(data,{restore:true});setIntro(null);setIndex(0);setVisited({});setFilter('all');setSync('โหลดคำตอบล่าสุดแล้ว');}
+  try{const data=await rpc('start',{id:a.id,code});accept(data,{restore:true});setIntro(null);setIndex(0);setFilter('all');setSync('โหลดคำตอบล่าสุดแล้ว');}
   catch(e){setError(e.message);}finally{flight.current=false;setBusy(false);}
  };
  const openResult=async(id)=>{setBusy(true);setError('');try{accept(await rpc('paper',{attempt_id:id}),{restore:true});setIndex(0);}catch(e){setError(e.message);}finally{setBusy(false);}};
@@ -119,7 +119,7 @@ export default function DeliveryPortal({sb,profile,onExit,onSignOut}) {
  const skipped=qs.filter(q=>visited[q.id]&&!String(answers[q.id]||'').trim()).length;
  const unsureN=qs.filter(q=>flags[q.id]).length;
  // navigate + mark the question we're leaving as "visited" (viewed but not answered → shows red)
- const go=(i)=>{const leaving=qs[index];if(leaving)setVisited(v=>v[leaving.id]?v:{...v,[leaving.id]:true});setIndex(i);};
+ const go=(i)=>{const leaving=qs[index];if(leaving&&!visitedRef.current[leaving.id]){visitedRef.current={...visitedRef.current,[leaving.id]:true};setVisited(visitedRef.current);persist();}setIndex(i);};
  const locked=seconds<=0||['advance','submit','paper'].includes(operation);
  const mustAll=!!attempt.require_all&&!meq;
  const allMode=!meq&&!sequential&&Number(attempt.questions_per_page)===0;
