@@ -452,3 +452,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 .consent-check input:disabled{cursor:not-allowed}
 .consent-body{margin:9px 0 2px;font-size:13px;color:var(--ink-soft);line-height:1.65}
 .consent-hint{margin:6px 0 0;font-size:12px;color:var(--muted,#8a97a0)}
+
+/* consolidated consent terms list */
+.consent-list{margin:10px 0 2px;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.consent-list li{font-size:13px;line-height:1.65;color:var(--ink-soft)}

@@ -19,10 +19,11 @@ export default function WriterApplication({ sb, profile, notify }) {
   const [specs, setSpecs] = useState([]);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [consent, setConsent] = useState({});
+  const [agreed, setAgreed] = useState(false);
   const [research, setResearch] = useState(false);
-  const [seen, setSeen] = useState(() => new Set());
-  const [openKey, setOpenKey] = useState(null);
+  const [seenTerms, setSeenTerms] = useState(false);
+  const [openTerms, setOpenTerms] = useState(false);
+  const [openResearch, setOpenResearch] = useState(false);
 
   const load = useCallback(async () => {
     const [{ data: a }, { data: mc }, { data: sp }] = await Promise.all([
@@ -33,19 +34,17 @@ export default function WriterApplication({ sb, profile, notify }) {
     setCenters((mc || []).sort((x, y) => ((y.short_name === "สพพ.") - (x.short_name === "สพพ.")) || (x.short_name || x.name_th).localeCompare(y.short_name || y.name_th, "th")));
     setSpecs(sp || []);
     setApp(a || null);
-    if (a && a.consent_at) { setConsent(Object.fromEntries(CONSENTS.map((c) => [c.key, true]))); setSeen(new Set(CONSENTS.map((c) => c.key))); setResearch(!!a.research_consent); }
+    if (a && a.consent_at) { setAgreed(true); setSeenTerms(true); setResearch(!!a.research_consent); }
     if (!a) { setForm(blank(profile)); setEditing(true); }
   }, [sb, profile]);
   useEffect(() => { load(); }, [load]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-  const toggleOpen = (k) => { setOpenKey((o) => o === k ? null : k); setSeen((s) => { const n = new Set(s); n.add(k); return n; }); };
-  const tick = (k, v) => { setConsent((c) => ({ ...c, [k]: v })); if (v) setOpenKey(null); };
-  const allConsented = CONSENTS.every((c) => consent[c.key]);
+  const allConsented = agreed;
 
   const submit = async () => {
     for (const [k, label] of REQUIRED) if (!String(form[k] || "").trim()) return notify("กรุณากรอก: " + label);
-    if (!allConsented) return notify("กรุณาอ่านและติ๊กยินยอมให้ครบทุกข้อก่อนสมัคร");
+    if (!allConsented) return notify("กรุณาอ่านเงื่อนไขและติ๊กยินยอมก่อนสมัคร");
     setBusy(true);
     const { data, error } = await sb.rpc("exam_writer_apply", { _data: { ...form, consent: true, research_consent: research } });
     setBusy(false);
@@ -93,28 +92,26 @@ export default function WriterApplication({ sb, profile, notify }) {
         <div className="field" style={{ marginTop: 8 }}><label>ประสบการณ์การออกข้อสอบ / เหตุผลในการสมัคร <span className="muted">(ไม่บังคับ)</span></label><textarea rows={4} value={form.motivation} onChange={(e) => set("motivation", e.target.value)} /></div>
 
         <div className="consent-gate">
-          <h3>ความยินยอมเกี่ยวกับข้อมูลส่วนบุคคล <span className="muted" style={{ fontSize: 13, fontWeight: 400 }}>(อ่านและติ๊กให้ครบทุกข้อ)</span></h3>
-          {CONSENTS.map((c) => { const open = openKey === c.key; const wasSeen = seen.has(c.key); return (
-            <div key={c.key} className={"consent-item" + (consent[c.key] ? " done" : "")}>
-              <div className="consent-head">
-                <label className="consent-check"><input type="checkbox" checked={!!consent[c.key]} disabled={!wasSeen} onChange={(e) => tick(c.key, e.target.checked)} /><b>{consent[c.key] ? "✓ " : ""}{c.title}</b></label>
-                <button type="button" className="btn ghost sm" onClick={() => toggleOpen(c.key)}>{open ? "ย่อ" : wasSeen ? "อ่านอีกครั้ง" : "อ่าน"}</button>
-              </div>
-              {open && <p className="consent-body">{c.body}</p>}
-              {!open && !wasSeen && <p className="consent-hint">กด “อ่าน” เพื่อดูรายละเอียดก่อนติ๊กยินยอม</p>}
+          <h3>เงื่อนไขและความยินยอมเกี่ยวกับข้อมูลส่วนบุคคล</h3>
+          <div className={"consent-item" + (agreed ? " done" : "")}>
+            <div className="consent-head">
+              <label className="consent-check"><input type="checkbox" checked={agreed} disabled={!seenTerms} onChange={(e) => setAgreed(e.target.checked)} /><b>{agreed ? "✓ " : ""}ข้าพเจ้าได้อ่านและยินยอมตามเงื่อนไขทั้งหมด</b></label>
+              <button type="button" className="btn ghost sm" onClick={() => { setOpenTerms((o) => !o); setSeenTerms(true); }}>{openTerms ? "ย่อ" : seenTerms ? "อ่านอีกครั้ง" : "อ่านเงื่อนไข"}</button>
             </div>
-          ); })}
+            {!openTerms && !seenTerms && <p className="consent-hint">กด “อ่านเงื่อนไข” เพื่อดูรายละเอียดก่อนติ๊กยินยอม</p>}
+            {openTerms && <ol className="consent-list">{CONSENTS.map((c) => <li key={c.key}><b>{c.title}</b> — {c.body}</li>)}</ol>}
+          </div>
           <div className={"consent-item optional" + (research ? " done" : "")}>
             <div className="consent-head">
               <label className="consent-check"><input type="checkbox" checked={research} onChange={(e) => setResearch(e.target.checked)} /><b>ยินยอมให้ใช้ข้อมูล/ข้อสอบเพื่อการวิจัยและพัฒนา <span className="muted" style={{ fontWeight: 400 }}>(ไม่บังคับ)</span></b></label>
-              <button type="button" className="btn ghost sm" onClick={() => toggleOpen("research")}>{openKey === "research" ? "ย่อ" : "อ่าน"}</button>
+              <button type="button" className="btn ghost sm" onClick={() => setOpenResearch((o) => !o)}>{openResearch ? "ย่อ" : "อ่าน"}</button>
             </div>
-            {openKey === "research" && <p className="consent-body">นำข้อมูลและผลงานข้อสอบ (ในรูปแบบที่ไม่ระบุตัวตนเท่าที่ทำได้) ไปใช้เพื่อการวิจัย พัฒนา และปรับปรุงคุณภาพระบบ/ข้อสอบ · เลือกได้ ไม่กระทบการพิจารณาแต่งตั้ง</p>}
+            {openResearch && <p className="consent-body">นำข้อมูลและผลงานข้อสอบ (ในรูปแบบที่ไม่ระบุตัวตนเท่าที่ทำได้) ไปใช้เพื่อการวิจัย พัฒนา และปรับปรุงคุณภาพระบบ/ข้อสอบ · เลือกได้ ไม่กระทบการพิจารณาแต่งตั้ง</p>}
           </div>
         </div>
 
         <div className="row" style={{ gap: 8, marginTop: 12, justifyContent: "flex-end", alignItems: "center" }}>
-          {!allConsented && <span className="muted" style={{ fontSize: 12 }}>ติ๊กยินยอมให้ครบทุกข้อจึงจะสมัครได้</span>}
+          {!allConsented && <span className="muted" style={{ fontSize: 12 }}>อ่านเงื่อนไขและติ๊กยินยอมก่อนจึงจะสมัครได้</span>}
           {app && <button className="btn ghost" disabled={busy} onClick={() => setEditing(false)}>ยกเลิก</button>}
           <button className="btn" disabled={busy || !allConsented} onClick={submit}>{busy ? "กำลังบันทึก…" : app ? "บันทึก" : "ส่งใบสมัคร"}</button>
         </div>
