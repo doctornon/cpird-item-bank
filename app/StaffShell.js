@@ -7,7 +7,7 @@ const PREVIEW_GROUPS=[
  ['ระบบทดสอบ',[['sets','สร้างชุดข้อสอบ'],['assign','จัดรอบการสอบและตั้งค่า']]],
  ['ห้องสอบของฉัน',[['take','ทำข้อสอบ (ตัวอย่าง)'],['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]],
 ];
-export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,isReviewer,isAnalyst,isCenterStaff,showApply,canWrite,canSets,canFullBank,preview,onLock,onSignOut,children}) {
+export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,isReviewer,isAnalyst,isCenterStaff,showApply,canWrite,canSets,canFullBank,preview,headerExtra,onLock,onSignOut,children}) {
  const [expanded,setExpanded]=useState(false);
  const [collapsed,setCollapsed]=useState(false);
  const [compact,setCompact]=useState(false);
@@ -35,6 +35,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,i
   <header className="staff-header">
    <button ref={menu} className="btn ghost sm staff-menu" aria-label={compact?'เมนูหลัก':collapsed?'แสดงเมนูหลัก':'ย่อเมนูหลัก'} aria-expanded={compact?expanded:!collapsed} aria-controls="staff-navigation" onClick={()=>compact?setExpanded(!expanded):setCollapsed(!collapsed)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
    <img src="/cpird-logo.png" alt="" className="brand-logo" onError={e=>{e.currentTarget.style.display='none';}}/><span className="brand">ระบบจัดทดสอบและวัดผล สพพ.</span><span className="grow"/>
+   {headerExtra}
    {onLock&&<button type="button" className="lock-toggle" role="switch" aria-checked={false} title="ล็อกหน้าจอเพื่อความปลอดภัย" onClick={onLock}><span className="lock-toggle-track"><span className="lock-toggle-thumb"/></span><span className="lock-toggle-label">🔓 ล็อกหน้าจอ</span></button>}
    <span className="who">{profile?.full_name||profile?.email}<br/><span className="muted">{superAdmin?'ผู้ดูแลระบบ':roles.join(', ')}</span></span>
    <button className="btn ghost sm staff-signout" onClick={onSignOut}>ออก</button>

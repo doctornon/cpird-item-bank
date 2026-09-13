@@ -468,3 +468,18 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
   .tablewrap { overflow:visible !important; }
   th { background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
 }
+
+/* notifications bell + inbox */
+.notif{position:relative;display:inline-flex}
+.notif-bell{position:relative;background:none;border:none;font-size:20px;line-height:1;padding:6px;border-radius:10px;transition:background .12s}
+.notif-bell:hover{background:var(--surface-2)}
+.notif-badge{position:absolute;top:0;right:0;min-width:16px;height:16px;padding:0 4px;background:var(--stop);color:#fff;font-size:10px;font-weight:700;border-radius:999px;display:flex;align-items:center;justify-content:center;line-height:1}
+.notif-pop{position:absolute;top:calc(100% + 8px);right:0;width:320px;max-width:90vw;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-3);z-index:210;overflow:hidden}
+.notif-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line);font-size:14px}
+.notif-list{max-height:60vh;overflow-y:auto}
+.notif-item{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--line-soft);padding:10px 12px;cursor:pointer;transition:background .12s}
+.notif-item:hover{background:var(--surface-2)}
+.notif-item.unread{background:var(--accent-tint)}
+.notif-title{font-size:13px;font-weight:600;color:var(--ink)}
+.notif-msg{font-size:12.5px;color:var(--ink-soft);margin-top:2px;line-height:1.5;white-space:pre-wrap}
+.notif-time{font-size:11px;color:var(--ink-faint);margin-top:3px}
