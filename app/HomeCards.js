@@ -7,7 +7,7 @@ export default function HomeCards({ profile, roles = [], superAdmin, canWrite, o
       title: "อาจารย์แพทย์ (ผู้ออกข้อสอบ)",
       bullets: ["สมัครเป็นคณะกรรมการออกข้อสอบ", "ร่างและส่งข้อสอบเข้าคลัง", "ดูและแก้ไขข้อสอบของตนเอง", "ทดลองทำข้อสอบในโหมดตัวอย่าง (demo)"],
       actions: isCommittee
-        ? [...(canWrite ? [["คลังข้อสอบของฉัน", () => onNavigate("mybank")]] : []), ["ทดลองโหมด demo", () => onNavigate("take")]]
+        ? [...(canWrite ? [["คลังข้อสอบของฉัน", () => onNavigate("mybank")]] : []), ["แก้ไขใบสมัคร / ดูสถานะ", () => onNavigate("apply")], ["ทดลองโหมด demo", () => onNavigate("take")]]
         : [["✍️ สมัครเป็นผู้ออกข้อสอบ", () => onNavigate("apply"), true], ["ทดลองโหมด demo", () => onNavigate("take")]],
     },
     {
