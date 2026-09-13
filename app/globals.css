@@ -426,3 +426,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 .apply-hero-txt b{font-size:16px;font-weight:700}
 .apply-hero-txt span{font-size:12px;opacity:.92;line-height:1.35}
 .apply-hero-arrow{font-size:22px;opacity:.85;flex:0 0 auto}
+
+/* required-field mark */
+.req{color:var(--stop,#c0392b);font-weight:700}
+/* role card bullets */
+.role-bullets{margin:8px 0 14px;padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.role-bullets li{font-size:13px;line-height:1.4;color:var(--muted,#5a6a6e)}
+/* pending-applicant preview shell */
+.preview-banner{background:#fff6e5;border:1px solid #f0c987;color:#8a5a00;border-radius:12px;padding:12px 14px;font-size:13.5px;line-height:1.5;margin-bottom:16px}
+.staff-nav button.locked{opacity:.42;cursor:not-allowed}
+.staff-nav button.locked:hover{background:none}

@@ -26,6 +26,7 @@ const [profile, setProfile] = useState(null);
 const [roles, setRoles] = useState([]);
 const [superAdmin, setSuperAdmin] = useState(false);
 const [access, setAccess] = useState(undefined);
+const [writerApp, setWriterApp] = useState(null);
 const [locked, setLocked] = useState(false);
 const [tab, setTab] = useState("home");
 const [bankStatus, setBankStatus] = useState("");
@@ -60,8 +61,9 @@ setSuperAdmin(!!sa);
 // item-bank access gate — the shared auth base includes students, so entry requires approval or an invite
 let inviteCode = null; try { inviteCode = new URL(window.location.href).searchParams.get("invite"); } catch {}
 if (inviteCode) { try { await sb.rpc("exam_redeem_invite", { _code: inviteCode }); } catch {} try { const u = new URL(window.location.href); u.searchParams.delete("invite"); window.history.replaceState({}, "", u.pathname + u.search + u.hash); } catch {} }
-const { data: acc } = await sb.rpc("exam_my_access");
+const [{ data: acc }, { data: wa }] = await Promise.all([sb.rpc("exam_my_access"), sb.rpc("exam_writer_my")]);
 setAccess(acc || { access: false });
+setWriterApp(wa || null);
 const [d, s, t, sp] = await Promise.all([
 sb.from("nl_domains").select("*").order("sort_order"),
 sb.from("nl_subitems").select("*").order("sort_order"),
@@ -84,7 +86,29 @@ if (!session) return <Login sb={sb} />;
 const bp = { domains, subitems, tasks, specs };
 const me = session.user.id;
 if (profile === null || access === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
-if (!access.access) return <AccessGate sb={sb} status={access.status} profile={profile} onSignOut={() => sb.auth.signOut()} onChanged={async () => { const { data: a } = await sb.rpc("exam_my_access"); setAccess(a || { access: false }); }} />;
+const refreshAccess = async () => { const [{ data: a }, { data: wa }] = await Promise.all([sb.rpc("exam_my_access"), sb.rpc("exam_writer_my")]); setAccess(a || { access: false }); setWriterApp(wa || null); };
+const applied = !!(writerApp && writerApp.status);
+if (!access.access) {
+if (!hasStaff && applied) {
+const allowed = ["home", "apply", "schedule", "take"];
+return (
+<>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={[]} superAdmin={false} canApprove={false} canWrite={false} canSets={false} canFullBank={false} preview onSignOut={() => sb.auth.signOut()}>
+<div className="section">
+<div className="preview-banner">⏳ บัญชีของคุณอยู่ระหว่างรอผู้ดูแล (สพพ.) พิจารณาแต่งตั้ง — ขณะนี้เข้าดูได้เฉพาะ “กำหนดการ” และ “ทำข้อสอบ (ตัวอย่าง)” · เมนูอื่นจะเปิดใช้งานเมื่อได้รับการแต่งตั้ง</div>
+{tab === "home" && <HomeCards profile={profile} roles={[]} superAdmin={false} canApprove={false} onNavigate={setTab} />}
+{tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
+{tab === "schedule" && <Schedule sb={sb} canWrite={false} notify={notify} />}
+{tab === "take" && <><div className="preview-banner" style={{ background: "var(--accent-tint)", color: "var(--ink)" }}>🧪 โหมดตัวอย่าง — ทดลองการทำข้อสอบก่อนได้รับการแต่งตั้ง</div><DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("home")} /></>}
+{!allowed.includes(tab) && <div className="card"><p className="muted" style={{ margin: 0 }}>🔒 เมนูนี้จะเปิดใช้งานเมื่อได้รับการแต่งตั้งเป็นผู้ออกข้อสอบ</p></div>}
+</div>
+</StaffShell>
+{toast && <div className="toast">{toast}</div>}
+</>
+);
+}
+return <AccessGate sb={sb} status={access.status} profile={profile} onSignOut={() => sb.auth.signOut()} onChanged={refreshAccess} />;
+}
 if (superAdmin && locked) return <LockScreen onUnlock={() => setLockedPersist(false)} />;
 // Non-staff users (students) get the exam-taking portal
 if (!hasStaff) {
@@ -142,7 +166,7 @@ const redeem = async () => { if (!code.trim()) return; setBusy(true); setMsg("")
 return (
 <div className="login"><div className="box" style={{ maxWidth: 460 }}>
 <img src="/cpird-logo.png" alt="CPIRD" style={{ height: 84, width: "auto", display: "block", margin: "0 auto 12px" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-<h2 style={{ color: "var(--accent)", marginBottom: 8 }}>ระบบคลังข้อสอบ CPIRD</h2>
+<h2 style={{ color: "var(--accent)", marginBottom: 8 }}>ระบบจัดทดสอบและวัดผล สพพ.</h2>
 {status === "pending" ? <>
 <p className="muted">บัญชี <b>{profile?.email}</b> ได้ส่งคำขอเข้าใช้งานแล้ว กรุณารอผู้ดูแลระบบอนุมัติ แล้วเข้าสู่ระบบอีกครั้ง</p>
 <button className="btn" disabled={busy} onClick={() => setApply(true)} style={{ marginTop: 14, width: "100%" }}>✍️ กรอก/แก้ไขใบสมัครผู้ออกข้อสอบ</button>
@@ -183,7 +207,7 @@ const go = () => sb.auth.signInWithOAuth({ provider: "google", options: { redire
 return (
 <div className="login"><div className="box">
 <img src="/cpird-logo.png" alt="CPIRD" style={{ height: 96, width: "auto", display: "block", margin: "0 auto 14px" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
-<h2 style={{ color: "var(--accent)", marginBottom: 6 }}>คลังข้อสอบ CPIRD</h2>
+<h2 style={{ color: "var(--accent)", marginBottom: 6 }}>ระบบจัดทดสอบและวัดผล สพพ.</h2>
 <p className="muted" style={{ marginBottom: 22 }}>ระบบจัดการคลังข้อสอบ MCQ/MEQ · เข้าสู่ระบบด้วยบัญชีเดียวกับ LMS</p>
 <button className="gbtn" onClick={go}>เข้าสู่ระบบด้วย Google</button>
 </div></div>

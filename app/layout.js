@@ -1,8 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "คลังข้อสอบ CPIRD | Item Bank",
-  description: "ระบบจัดการคลังข้อสอบ MCQ/MEQ ตาม NL blueprint",
+  title: "ระบบจัดทดสอบและวัดผล สพพ.",
+  description: "ระบบจัดทดสอบและวัดผล สพพ. — คลังข้อสอบและจัดสอบ MCQ/MEQ ตาม NL blueprint",
+  icons: { icon: "/cpird-logo.png", apple: "/cpird-logo.png" },
 };
 
 export default function RootLayout({ children }) {

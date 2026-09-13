@@ -9,7 +9,7 @@ return `${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
 function PortalTop({ profile, onSignOut }) {
 return (
 <div className="topbar"><div className="wrap in">
-<span className="brand">คลังข้อสอบ CPIRD · สอบออนไลน์</span>
+<span className="brand">ระบบจัดทดสอบและวัดผล สพพ. · สอบออนไลน์</span>
 <span className="grow" />
 <span className="who">{profile?.full_name || profile?.email}<br /><span className="muted">นักศึกษา</span></span>
 <button className="btn ghost sm" onClick={onSignOut}>ออก</button>

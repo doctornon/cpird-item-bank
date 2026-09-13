@@ -127,7 +127,7 @@ export default function ScoreAnalytics({ sb, bp, notify, initialTab }) {
     const emailIt = () => {
       if (!r.student_email) return notify("ผู้สอบคนนี้ไม่มีอีเมลในระบบ");
       const subject = encodeURIComponent("ผลสอบ: " + r.assignment_title);
-      const body = encodeURIComponent(`เรียน ${r.student_name || ""}\n\nผลสอบ "${r.assignment_title}" ครั้งที่ ${r.attempt_no}\nคะแนน: ${r.score} / ${r.max_score} (${pct(r.percent)}) · ${r.passed ? "ผ่าน" : "ไม่ผ่าน"} (เกณฑ์ ${r.pass_mark}%)\nส่งเมื่อ: ${fdate(r.submitted_at)}\n\nคลังข้อสอบ CPIRD`);
+      const body = encodeURIComponent(`เรียน ${r.student_name || ""}\n\nผลสอบ "${r.assignment_title}" ครั้งที่ ${r.attempt_no}\nคะแนน: ${r.score} / ${r.max_score} (${pct(r.percent)}) · ${r.passed ? "ผ่าน" : "ไม่ผ่าน"} (เกณฑ์ ${r.pass_mark}%)\nส่งเมื่อ: ${fdate(r.submitted_at)}\n\nระบบจัดทดสอบและวัดผล สพพ.`);
       window.location.href = `mailto:${r.student_email}?subject=${subject}&body=${body}`;
     };
     const filterLabel = { correct: " (เฉพาะถูก)", incorrect: " (เฉพาะผิด)", bookmarked: " (ปักหมุด)", selected: ` (ที่เลือก ${selIds.size})` }[ansFilter] || "";
