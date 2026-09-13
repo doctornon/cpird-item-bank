@@ -14,17 +14,29 @@ export default function AccountsAdmin({ sb, me, notify }) {
   const [invites, setInvites] = useState([]);
   const [showInv, setShowInv] = useState(false);
   const [invForm, setInvForm] = useState({ label: "", days: "14", max: "" });
+  const [apps, setApps] = useState([]);
+  const [showApps, setShowApps] = useState(false);
 
   const load = useCallback(async (term) => {
     setLoading(true);
-    const [{ data, error }, { data: mc }, { data: inv }] = await Promise.all([
+    const [{ data, error }, { data: mc }, { data: inv }, { data: ap }] = await Promise.all([
       sb.rpc("exam_user_accounts", { _q: term || null }),
       sb.from("medical_centers").select("id,name_th,short_name").eq("is_active", true),
       sb.rpc("exam_list_invites"),
+      sb.rpc("exam_writer_list"),
     ]);
     if (error) { notify("โหลดบัญชีผู้ใช้ไม่สำเร็จ: " + error.message); setLoading(false); return; }
-    setRows(data || []); setCenters(sortCenters(mc || [])); setInvites(inv || []); setLoading(false);
+    setRows(data || []); setCenters(sortCenters(mc || [])); setInvites(inv || []); setApps(ap || []); setLoading(false);
   }, [sb, notify]);
+  const decideApp = async (uid, status, role) => {
+    setBusy(true);
+    const { error } = await sb.rpc("exam_writer_decide", { _uid: uid, _status: status, _role: role || "item_writer" });
+    setBusy(false);
+    if (error) return notify("ผิดพลาด: " + error.message);
+    setApps((a) => a.map((x) => x.user_id === uid ? { ...x, status } : x));
+    notify(status === "appointed" ? "แต่งตั้งเป็นผู้ออกข้อสอบแล้ว" : status === "rejected" ? "ปฏิเสธใบสมัครแล้ว" : "อัปเดตแล้ว");
+    load(q);
+  };
   useEffect(() => { load(""); }, [load]);
 
   const centerName = (cid) => { const c = centers.find((x) => String(x.id) === String(cid)); return c ? (c.short_name || c.name_th) : null; };
@@ -93,7 +105,27 @@ export default function AccountsAdmin({ sb, me, notify }) {
   return (
     <div>
       <div className="workspace-heading"><div><h2>จัดการบัญชีผู้ใช้</h2><p>อนุมัติ/บล็อคการเข้าใช้ระบบคลังข้อสอบ กำหนดศูนย์แพทย์และสิทธิ์ · การสมัครยึดตามการเข้าสู่ระบบในเว็บนี้ · เฉพาะผู้ดูแลระบบ</p></div>
-        <button className="btn" onClick={() => setShowInv((v) => !v)}>{showInv ? "ซ่อนลิงก์เชิญ" : "🔗 ลิงก์เชิญเข้าใช้งาน"}</button></div>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn ghost" onClick={() => setShowApps((v) => !v)}>{showApps ? "ซ่อนใบสมัคร" : "📝 ใบสมัครผู้ออกข้อสอบ" + (apps.filter((a) => a.status === "pending").length ? " (" + apps.filter((a) => a.status === "pending").length + ")" : "")}</button>
+          <button className="btn" onClick={() => setShowInv((v) => !v)}>{showInv ? "ซ่อนลิงก์เชิญ" : "🔗 ลิงก์เชิญเข้าใช้งาน"}</button>
+        </div></div>
+      {showApps && <div className="card" style={{ marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0 }}>ใบสมัครเป็นผู้ออกข้อสอบ</h3>
+        {apps.length === 0 ? <p className="muted">ยังไม่มีใบสมัคร</p> : <div className="tablewrap"><table>
+          <thead><tr><th>ผู้สมัคร</th><th>ตำแหน่ง / สังกัด</th><th>ศูนย์แพทย์</th><th>สาขา</th><th>สถานะ</th><th>พิจารณา</th></tr></thead>
+          <tbody>{apps.map((a) => <tr key={a.user_id}>
+            <td>{a.full_name || "—"}<br /><span className="muted">{a.email}{a.phone ? " · " + a.phone : ""}</span>{a.motivation ? <div className="muted" style={{ fontSize: 12, marginTop: 4, whiteSpace: "pre-wrap" }}>{a.motivation}</div> : null}</td>
+            <td>{a.position || "—"}{a.affiliation ? <div className="muted">{a.affiliation}</div> : null}</td>
+            <td>{a.center_name || "—"}</td>
+            <td>{a.specialties || "—"}</td>
+            <td><span className={"pill " + (a.status === "appointed" ? "approved" : a.status === "rejected" ? "retired" : "draft")}>{a.status === "appointed" ? "แต่งตั้งแล้ว" : a.status === "rejected" ? "ปฏิเสธ" : "รอพิจารณา"}</span>{(a.roles || []).length ? <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>สิทธิ์: {(a.roles || []).join(", ")}</div> : null}</td>
+            <td><div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+              {a.status !== "appointed" && <><button className="btn ghost sm" disabled={busy} onClick={() => decideApp(a.user_id, "appointed", "item_writer")}>แต่งตั้ง: ผู้ออกข้อสอบ</button><button className="btn ghost sm" disabled={busy} onClick={() => decideApp(a.user_id, "appointed", "committee")}>แต่งตั้ง: กรรมการ</button></>}
+              {a.status !== "rejected" && <button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy} onClick={() => decideApp(a.user_id, "rejected")}>ปฏิเสธ</button>}
+            </div></td>
+          </tr>)}</tbody>
+        </table></div>}
+      </div>}
 
       {showInv && <div className="card" style={{ marginBottom: 16 }}>
         <h3 style={{ marginTop: 0 }}>ลิงก์เชิญเข้าใช้งาน (กำหนดช่วงเวลาได้)</h3>

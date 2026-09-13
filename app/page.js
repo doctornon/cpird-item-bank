@@ -15,6 +15,8 @@ import Import from "./Import";
 import RolesAdmin from "./RolesAdmin";
 import AccountsAdmin from "./AccountsAdmin";
 import Certificates from "./Certificates";
+import HomeCards from "./HomeCards";
+import WriterApplication from "./WriterApplication";
 import DeliveryPortal from "./DeliveryPortal";
 import DeliveryManager from "./DeliveryManager";
 export default function Page() {
@@ -25,7 +27,7 @@ const [roles, setRoles] = useState([]);
 const [superAdmin, setSuperAdmin] = useState(false);
 const [access, setAccess] = useState(undefined);
 const [locked, setLocked] = useState(false);
-const [tab, setTab] = useState("dashboard");
+const [tab, setTab] = useState("home");
 const [bankStatus, setBankStatus] = useState("");
 const [toast, setToast] = useState("");
 const [domains, setDomains] = useState([]);
@@ -95,6 +97,8 @@ return (
 <>
 <StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} canSets={canSets} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
+{tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} onNavigate={setTab} />}
+{tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
 {tab === "dashboard" && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "meq" && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
@@ -120,6 +124,16 @@ function AccessGate({ sb, status, profile, onSignOut, onChanged }) {
 const [busy, setBusy] = useState(false);
 const [code, setCode] = useState("");
 const [msg, setMsg] = useState("");
+const [apply, setApply] = useState(false);
+if (apply) return (
+<div className="login"><div className="box" style={{ maxWidth: 780, width: "100%", textAlign: "left" }}>
+<button className="btn ghost sm" onClick={() => { setApply(false); setMsg(""); onChanged(); }}>← กลับหน้าเข้าสู่ระบบ</button>
+<div style={{ marginTop: 12 }}><WriterApplication sb={sb} profile={profile} notify={(m) => setMsg(m)} /></div>
+{msg && <p className="delivery-sync" style={{ marginTop: 10 }}>{msg}</p>}
+<p className="muted" style={{ marginTop: 12 }}>เมื่อส่งใบสมัครแล้ว ผู้ดูแล (สพพ.) จะพิจารณาแต่งตั้ง จากนั้นบัญชีของคุณจะเข้าใช้งานได้</p>
+<button className="btn ghost sm" onClick={onSignOut} style={{ marginTop: 8 }}>ออกจากระบบ</button>
+</div></div>
+);
 const request = async () => { setBusy(true); setMsg(""); const { error } = await sb.rpc("exam_request_access"); setBusy(false); if (error) return setMsg("เกิดข้อผิดพลาด: " + error.message); await onChanged(); };
 const redeem = async () => { if (!code.trim()) return; setBusy(true); setMsg(""); const { data, error } = await sb.rpc("exam_redeem_invite", { _code: code.trim() }); setBusy(false); if (error) return setMsg(error.message); if (data && data.ok === false) return setMsg(data.error || "ลิงก์เชิญไม่ถูกต้อง"); await onChanged(); };
 return (
@@ -128,12 +142,14 @@ return (
 <h2 style={{ color: "var(--accent)", marginBottom: 8 }}>ระบบคลังข้อสอบ CPIRD</h2>
 {status === "pending" ? <>
 <p className="muted">บัญชี <b>{profile?.email}</b> ได้ส่งคำขอเข้าใช้งานแล้ว กรุณารอผู้ดูแลระบบอนุมัติ แล้วเข้าสู่ระบบอีกครั้ง</p>
-<button className="btn ghost" disabled={busy} onClick={onChanged} style={{ marginTop: 14 }}>ตรวจสอบสถานะอีกครั้ง</button>
+<button className="btn" disabled={busy} onClick={() => setApply(true)} style={{ marginTop: 14, width: "100%" }}>✍️ กรอก/แก้ไขใบสมัครผู้ออกข้อสอบ</button>
+<button className="btn ghost" disabled={busy} onClick={onChanged} style={{ marginTop: 8 }}>ตรวจสอบสถานะอีกครั้ง</button>
 </> : status === "revoked" ? <>
 <p className="delivery-alert" style={{ marginTop: 10 }}>บัญชีนี้ถูกระงับการเข้าใช้งานระบบคลังข้อสอบ โปรดติดต่อผู้ดูแลระบบ</p>
 </> : <>
 <p className="muted">ระบบนี้จำกัดเฉพาะผู้ได้รับอนุญาต (บัญชี <b>{profile?.email}</b>) — กด “ขอเข้าใช้งาน” เพื่อให้ผู้ดูแลอนุมัติ หรือกรอกรหัส/ลิงก์เชิญที่ได้รับ</p>
-<button className="btn" disabled={busy} onClick={request} style={{ marginTop: 16, width: "100%" }}>ขอเข้าใช้งาน (รออนุมัติ)</button>
+<button className="btn" disabled={busy} onClick={() => setApply(true)} style={{ marginTop: 16, width: "100%" }}>✍️ สมัครเป็นผู้ออกข้อสอบ (อาจารย์แพทย์)</button>
+<button className="btn ghost" disabled={busy} onClick={request} style={{ marginTop: 8, width: "100%" }}>ขอเข้าใช้งานทั่วไป (รออนุมัติ)</button>
 <div style={{ margin: "14px 0 8px", textAlign: "center" }} className="muted">— หรือ —</div>
 <div className="row" style={{ gap: 6 }}><input placeholder="รหัสเชิญ หรือวางลิงก์เชิญ" value={code} onChange={(e) => { const v = e.target.value; setCode(v.includes("invite=") ? v.split("invite=")[1].split(/[&#]/)[0] : v); }} /><button className="btn" disabled={busy || !code.trim()} onClick={redeem}>ใช้รหัส</button></div>
 </>}
