@@ -236,7 +236,7 @@ return (
 {item && canApprove && form.status !== "review" && <button className="btn ghost sm" disabled={dirty || busy} onClick={() => setStatus("review")}>ส่งทบทวน</button>}
 {item && canApprove && form.status !== "retired" && <button className="btn ghost sm" disabled={dirty || busy} onClick={() => setStatus("retired")}>ปลด</button>}
 </div>
-<button className="btn" onClick={save} disabled={busy || previewOnly}>{busy ? "กำลังบันทึก…" : "บันทึก"}</button>
+<div className="row" style={{ gap: 8 }}><button type="button" className="btn ghost" disabled={busy} onClick={requestClose}>ยกเลิก</button><button className="btn" onClick={save} disabled={busy || previewOnly}>{busy ? "กำลังบันทึก…" : "บันทึก"}</button></div>
 </div>
 </fieldset>
 </div>
