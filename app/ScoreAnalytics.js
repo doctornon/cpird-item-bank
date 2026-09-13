@@ -19,10 +19,10 @@ function agg(rows) {
   return { n: rows.length, students, avg, passed, passRate: rows.length ? (100 * passed) / rows.length : null };
 }
 
-export default function ScoreAnalytics({ sb, bp, notify }) {
+export default function ScoreAnalytics({ sb, bp, notify, initialTab }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("sets"); // sets | centers | people
+  const [tab, setTab] = useState(initialTab || "sets"); // sets | centers | people
   const [sel, setSel] = useState({}); // {set, center, student, assignment, attempt}
   const [answers, setAnswers] = useState(null);
   const [itemAnalysis, setItemAnalysis] = useState(null);

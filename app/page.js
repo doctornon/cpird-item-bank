@@ -14,6 +14,7 @@ import Schedule from "./Schedule";
 import Import from "./Import";
 import RolesAdmin from "./RolesAdmin";
 import AccountsAdmin from "./AccountsAdmin";
+import Certificates from "./Certificates";
 import DeliveryPortal from "./DeliveryPortal";
 import DeliveryManager from "./DeliveryManager";
 export default function Page() {
@@ -100,7 +101,9 @@ return (
 {canApprove && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
-{tab === "scores" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} />}
+{tab === "scores" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="people" />}
+{tab === "analyze" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="sets" />}
+{tab === "cert" && canApprove && <Certificates sb={sb} notify={notify} />}
 {tab === "comp" && canApprove && <ItemCompensation sb={sb} notify={notify} />}
 {tab === "schedule" && <Schedule sb={sb} canWrite={canApprove} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
