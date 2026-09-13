@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-const ROLES = [["item_writer", "ผู้ออกข้อสอบ"], ["committee", "กรรมการ"], ["set_manager", "จัดชุดข้อสอบ"], ["registrar", "ทะเบียน"]];
+const ROLES = [["item_writer", "ออกข้อสอบ"], ["reviewer", "คัดเลือก/วิพากษ์"], ["set_manager", "จัดทำชุด"], ["analyst", "วิเคราะห์ผล"], ["committee", "กรรมการ (รวม)"], ["registrar", "ทะเบียน"]];
 const fmtDate = (s) => { if (!s) return "—"; const d = new Date(s); return isNaN(d) ? "—" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); };
 const sortCenters = (list) => [...list].sort((a, b) => ((b.short_name === "สพพ.") - (a.short_name === "สพพ.")) || (a.short_name || a.name_th).localeCompare(b.short_name || b.name_th, "th"));
 

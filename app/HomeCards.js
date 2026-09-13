@@ -1,13 +1,13 @@
 "use client";
-export default function HomeCards({ profile, roles = [], superAdmin, canApprove, onNavigate }) {
-  const isWriter = roles.includes("item_writer") || roles.includes("committee") || roles.includes("set_manager");
+export default function HomeCards({ profile, roles = [], superAdmin, canWrite, onNavigate, only }) {
+  const isCommittee = superAdmin || ["item_writer", "reviewer", "set_manager", "analyst", "committee"].some((r) => roles.includes(r));
   const cards = [
     {
       key: "teacher", icon: "🩺", tone: "a",
       title: "อาจารย์แพทย์ (ผู้ออกข้อสอบ)",
       bullets: ["สมัครเป็นคณะกรรมการออกข้อสอบ", "ร่างและส่งข้อสอบเข้าคลัง", "ดูและแก้ไขข้อสอบของตนเอง", "ทดลองทำข้อสอบในโหมดตัวอย่าง (demo)"],
-      actions: isWriter
-        ? [["คลังข้อสอบของฉัน", () => onNavigate("mybank")], ["ทดลองโหมด demo", () => onNavigate("take")]]
+      actions: isCommittee
+        ? [...(canWrite ? [["คลังข้อสอบของฉัน", () => onNavigate("mybank")]] : []), ["ทดลองโหมด demo", () => onNavigate("take")]]
         : [["✍️ สมัครเป็นผู้ออกข้อสอบ", () => onNavigate("apply"), true], ["ทดลองโหมด demo", () => onNavigate("take")]],
     },
     {
@@ -29,11 +29,12 @@ export default function HomeCards({ profile, roles = [], superAdmin, canApprove,
       actions: [["เข้าห้องสอบ / ทำข้อสอบ", () => onNavigate("take"), true]],
     },
   ];
+  const visible = only ? cards.filter((c) => only.includes(c.key)) : cards;
   return (
     <div>
-      <div className="workspace-heading"><div><h2>ยินดีต้อนรับสู่ระบบจัดทดสอบและวัดผล สพพ.</h2><p>เลือกบทบาทการใช้งานของคุณ — {profile?.full_name || profile?.email}</p></div></div>
-      <div className="role-cards">
-        {cards.map((c) => (
+      <div className="workspace-heading"><div><h2>ยินดีต้อนรับสู่ระบบจัดทดสอบและวัดผล สพพ.</h2><p>{visible.length > 1 ? "เลือกบทบาทการใช้งานของคุณ" : "บทบาทการใช้งานของคุณ"} — {profile?.full_name || profile?.email}</p></div></div>
+      <div className={"role-cards" + (visible.length === 1 ? " role-cards-solo" : "")}>
+        {visible.map((c) => (
           <article key={c.key} className={"role-card role-" + c.tone}>
             <div className="role-icon" aria-hidden="true">{c.icon}</div>
             <h3>{c.title}</h3>

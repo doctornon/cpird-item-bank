@@ -7,7 +7,7 @@ const PREVIEW_GROUPS=[
  ['ระบบทดสอบ',[['sets','สร้างชุดข้อสอบ'],['assign','จัดรอบการสอบและตั้งค่า']]],
  ['ห้องสอบของฉัน',[['take','ทำข้อสอบ (ตัวอย่าง)'],['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]],
 ];
-export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,canSets,canFullBank,preview,onLock,onSignOut,children}) {
+export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,isReviewer,isAnalyst,canWrite,canSets,canFullBank,preview,onLock,onSignOut,children}) {
  const [expanded,setExpanded]=useState(false);
  const [collapsed,setCollapsed]=useState(false);
  const [compact,setCompact]=useState(false);
@@ -24,10 +24,10 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
  },[expanded]);
  const groups=preview?PREVIEW_GROUPS:[
   ['ภาพรวม', [['home','หน้าแรก'],...(canFullBank?[['dashboard','แดชบอร์ด']]:[]),['schedule','กำหนดการ & ประกาศ ศรว.'],...(!canWrite?[['apply','สมัครเป็นผู้ออกข้อสอบ']]:[])]],
-  ['คลังข้อสอบ', [...(canFullBank?[['bank','คลัง MCQ'],['meq','คลัง MEQ']]:[]),...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
-  ['ระบบทดสอบ', [...(canSets?[['sets','สร้างชุดข้อสอบ']]:[]),...(canApprove?[['assign','จัดรอบการสอบและตั้งค่า']]:[])]],
-  ['ห้องสอบของฉัน', [['take','ทำข้อสอบ'],...(canApprove?[['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]:[])]],
-  ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(canApprove?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['accounts','จัดการบัญชีผู้ใช้'],['roles','จัดการสิทธิ์']]:[])]]
+  ['คลังข้อสอบ', [...(canFullBank?[['bank','คลัง MCQ'],['meq','คลัง MEQ']]:[]),...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(isReviewer?[['theater','วิพากษ์ข้อสอบ']]:[])]],
+  ['ระบบทดสอบ', [...(canSets?[['sets','สร้างชุดข้อสอบ']]:[]),...(superAdmin?[['assign','จัดรอบการสอบและตั้งค่า']]:[])]],
+  ['ห้องสอบของฉัน', [['take','ทำข้อสอบ'],...(isAnalyst?[['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]:[])]],
+  ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(superAdmin?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['accounts','จัดการบัญชีผู้ใช้'],['roles','จัดการสิทธิ์']]:[])]]
  ];
  const navigate=key=>{if(preview&&!PREVIEW_ALLOWED.has(key))return;onNavigate(key);setExpanded(false);};
  return <div className={'staff-shell'+(collapsed?' nav-collapsed':'')}>

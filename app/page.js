@@ -74,12 +74,14 @@ setDomains(d.data || []); setSubitems(s.data || []);
 setTasks(t.data || []); setSpecs(sp.data || []);
 })();
 }, [session, sb]);
-const canWrite = superAdmin || roles.includes("committee") || roles.includes("item_writer");
-const canApprove = superAdmin || roles.includes("committee");
-const canSets = superAdmin || roles.includes("committee") || roles.includes("set_manager");
-// who may browse the SHARED item bank (matches the bank_items RLS read policy exactly);
-// a pure item_writer is excluded — they see only their own items via "คลังข้อสอบของฉัน"
-const canFullBank = superAdmin || roles.includes("committee") || roles.includes("registrar") || roles.includes("set_manager");
+// committee model — one person may hold several roles (committee = ทุกหน้าที่)
+const canWrite = superAdmin || roles.includes("committee") || roles.includes("item_writer");   // กรรมการออกข้อสอบ
+const isReviewer = superAdmin || roles.includes("committee") || roles.includes("reviewer");      // กรรมการคัดเลือก/วิพากษ์
+const canSets = superAdmin || roles.includes("committee") || roles.includes("set_manager");      // กรรมการจัดทำชุด
+const isAnalyst = superAdmin || roles.includes("committee") || roles.includes("analyst");        // กรรมการวิเคราะห์ผล
+// จัดรอบการสอบ + ค่าตอบแทน = เจ้าหน้าที่ สพพ. (admin) เท่านั้น
+// who may browse the SHARED item bank (matches the bank_items RLS read policy) — pure item_writer excluded
+const canFullBank = superAdmin || roles.includes("committee") || roles.includes("reviewer") || roles.includes("set_manager") || roles.includes("analyst") || roles.includes("registrar");
 const hasStaff = superAdmin || roles.length > 0;
 if (session === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
 if (!session) return <Login sb={sb} />;
@@ -96,7 +98,7 @@ return (
 <StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={[]} superAdmin={false} canApprove={false} canWrite={false} canSets={false} canFullBank={false} preview onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 <div className="preview-banner">⏳ บัญชีของคุณอยู่ระหว่างรอผู้ดูแล (สพพ.) พิจารณาแต่งตั้ง — ขณะนี้เข้าดูได้เฉพาะ “กำหนดการ” และ “ทำข้อสอบ (ตัวอย่าง)” · เมนูอื่นจะเปิดใช้งานเมื่อได้รับการแต่งตั้ง</div>
-{tab === "home" && <HomeCards profile={profile} roles={[]} superAdmin={false} canApprove={false} onNavigate={setTab} />}
+{tab === "home" && <HomeCards profile={profile} roles={[]} superAdmin={false} canWrite={false} onNavigate={setTab} only={["teacher"]} />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
 {tab === "schedule" && <Schedule sb={sb} canWrite={false} notify={notify} />}
 {tab === "take" && <><div className="preview-banner" style={{ background: "var(--accent-tint)", color: "var(--ink)" }}>🧪 โหมดตัวอย่าง — ทดลองการทำข้อสอบก่อนได้รับการแต่งตั้ง</div><DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("home")} /></>}
@@ -122,22 +124,22 @@ return (
 if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
-<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
-{tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} onNavigate={setTab} />}
+{tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canWrite={canWrite} onNavigate={setTab} only={superAdmin ? null : (canWrite || isReviewer || canSets || isAnalyst ? ["teacher"] : ["staff"])} />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
 {tab === "dashboard" && canFullBank && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
-{tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
-{tab === "meq" && canFullBank && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
+{tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
+{tab === "meq" && canFullBank && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
 {tab === "mybank" && canWrite && <MyBank sb={sb} bp={bp} me={me} canWrite={canWrite} notify={notify} />}
 {canSets && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
-{tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
-{tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
-{tab === "scores" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="people" />}
-{tab === "analyze" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="sets" />}
-{tab === "cert" && canApprove && <Certificates sb={sb} notify={notify} />}
-{tab === "comp" && canApprove && <ItemCompensation sb={sb} notify={notify} />}
-{tab === "schedule" && <Schedule sb={sb} canWrite={canApprove} notify={notify} />}
+{tab === "assign" && superAdmin && <DeliveryManager sb={sb} />}
+{tab === "theater" && isReviewer && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
+{tab === "scores" && isAnalyst && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="people" />}
+{tab === "analyze" && isAnalyst && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="sets" />}
+{tab === "cert" && isAnalyst && <Certificates sb={sb} notify={notify} />}
+{tab === "comp" && superAdmin && <ItemCompensation sb={sb} notify={notify} />}
+{tab === "schedule" && <Schedule sb={sb} canWrite={superAdmin} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "accounts" && superAdmin && <AccountsAdmin sb={sb} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}

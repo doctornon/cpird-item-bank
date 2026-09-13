@@ -1,11 +1,21 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-const ROLES = ["item_writer", "committee", "set_manager", "registrar"];
+const ROLES = ["item_writer", "reviewer", "set_manager", "analyst", "committee", "registrar"];
+const ROLE_SHORT = {
+item_writer: "ออกข้อสอบ",
+reviewer: "คัดเลือก/วิพากษ์",
+set_manager: "จัดทำชุด",
+analyst: "วิเคราะห์ผล",
+committee: "กรรมการ (รวม)",
+registrar: "ทะเบียน",
+};
 const ROLE_TH = {
-item_writer: "ผู้ออกข้อสอบ",
-committee: "กรรมการ (วิพากษ์/อนุมัติ/ชุดข้อสอบ)",
-set_manager: "จัดชุดข้อสอบ (สร้างชุด/คัดเลือกข้อ)",
-registrar: "ทะเบียน (ดูชุดข้อสอบ)",
+item_writer: "กรรมการออกข้อสอบ — ร่าง/ส่งข้อสอบเข้าคลัง (เห็นเฉพาะข้อของตน)",
+reviewer: "กรรมการคัดเลือก/วิพากษ์ข้อสอบ — วิพากษ์และอนุมัติข้อเข้าคลังรวม",
+set_manager: "กรรมการจัดทำชุดข้อสอบ — สร้างชุด/คัดเลือกข้อเข้าชุด",
+analyst: "กรรมการวิเคราะห์ผลสอบ — ดูคะแนน/วิเคราะห์ผล/ประกาศนียบัตร",
+committee: "กรรมการ (ครบทุกหน้าที่)",
+registrar: "ทะเบียน — ดูชุดข้อสอบและผลสอบ",
 };
 export default function RolesAdmin({ sb, me, notify }) {
 const [holders, setHolders] = useState([]);
@@ -52,7 +62,7 @@ return (
 </div>
 <div className="tablewrap" style={{ marginTop: 12 }}>
 <table>
-<thead><tr><th>ผู้ใช้</th>{ROLES.map((r) => <th key={r} style={{ textAlign: "center" }}>{ROLE_TH[r].split(" ")[0]}</th>)}</tr></thead>
+<thead><tr><th>ผู้ใช้</th>{ROLES.map((r) => <th key={r} style={{ textAlign: "center" }}>{ROLE_SHORT[r]}</th>)}</tr></thead>
 <tbody>
 {searched && results.length === 0 && <tr><td colSpan={ROLES.length + 1}><div className="empty">ไม่พบผู้ใช้</div></td></tr>}
 {results.map((u) => {
@@ -73,7 +83,7 @@ return <td key={role} style={{ textAlign: "center" }}>
 </table>
 </div>
 <div className="muted" style={{ marginTop: 10, fontSize: 12 }}>
-{ROLES.map((r) => <div key={r}>• <b>{ROLE_TH[r].split(" ")[0]}</b> = {ROLE_TH[r]}</div>)}
+{ROLES.map((r) => <div key={r}>• <b>{ROLE_SHORT[r]}</b> = {ROLE_TH[r]}</div>)}
 </div>
 </div>
 <div className="card">
@@ -86,7 +96,7 @@ return <td key={role} style={{ textAlign: "center" }}>
 {Object.entries(byUser).map(([uid, rs]) => (
 <tr key={uid}>
 <td>{names[uid] || uid.slice(0, 8)}{uid === me ? " (คุณ)" : ""}</td>
-<td>{rs.map((r) => <span key={r} className="pill approved" style={{ marginRight: 4 }}>{ROLE_TH[r].split(" ")[0]}</span>)}</td>
+<td>{rs.map((r) => <span key={r} className="pill approved" style={{ marginRight: 4 }}>{ROLE_SHORT[r] || r}</span>)}</td>
 </tr>
 ))}
 </tbody>
