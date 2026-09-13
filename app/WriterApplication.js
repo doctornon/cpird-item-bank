@@ -12,7 +12,7 @@ const CONSENTS = [
   { key: "rights", title: "สิทธิของท่านและผลของการถอนความยินยอม", body: "ท่านมีสิทธิ์เข้าถึง แก้ไข และถอนความยินยอมได้ โดยการถอนไม่กระทบการประมวลผลก่อนหน้า และข้อสอบที่จัดทำและถูกนำไปใช้แล้วยังคงอยู่ในคลังของ สพพ. (เรียกคืนไม่ได้)" },
 ];
 
-export default function WriterApplication({ sb, profile, notify }) {
+export default function WriterApplication({ sb, profile, notify, onApplied }) {
   const [app, setApp] = useState(undefined); // undefined=loading, null=none
   const [form, setForm] = useState(null);
   const [centers, setCenters] = useState([]);
@@ -50,6 +50,7 @@ export default function WriterApplication({ sb, profile, notify }) {
     setBusy(false);
     if (error) return notify("บันทึกใบสมัครไม่สำเร็จ: " + error.message);
     setApp(data); setEditing(false); notify("บันทึกใบสมัครแล้ว — เริ่มสร้างข้อสอบได้เลยที่ “คลังข้อสอบของฉัน” ระหว่างรอแต่งตั้ง");
+    onApplied?.();
   };
 
   if (app === undefined) return <p className="muted" role="status">กำลังโหลด…</p>;

@@ -91,7 +91,8 @@ if (!session) return <Login sb={sb} />;
 const bp = { domains, subitems, tasks, specs };
 const me = session.user.id;
 if (profile === null || access === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
-const refreshAccess = async () => { const [{ data: a }, { data: wa }] = await Promise.all([sb.rpc("exam_my_access"), sb.rpc("exam_writer_my")]); setAccess(a || { access: false }); setWriterApp(wa || null); };
+const reloadIdentity = async () => { const uid = session.user.id; const [{ data: rr }, { data: a }, { data: wa }] = await Promise.all([sb.from("exam_item_roles").select("role").eq("user_id", uid), sb.rpc("exam_my_access"), sb.rpc("exam_writer_my")]); setRoles((rr || []).map((x) => x.role)); setAccess(a || { access: false }); setWriterApp(wa || null); };
+const refreshAccess = reloadIdentity;
 const applied = !!(writerApp && writerApp.status);
 if (!access.access) {
 if (!hasStaff && applied) {
@@ -102,7 +103,7 @@ return (
 <div className="section">
 <div className="preview-banner">⏳ บัญชีของคุณอยู่ระหว่างรอผู้ดูแล (สพพ.) พิจารณาแต่งตั้ง — ขณะนี้เข้าดูได้เฉพาะ “กำหนดการ” และ “ทำข้อสอบ (ตัวอย่าง)” · เมนูอื่นจะเปิดใช้งานเมื่อได้รับการแต่งตั้ง</div>
 {tab === "home" && <HomeCards profile={profile} roles={[]} superAdmin={false} canWrite={false} onNavigate={setTab} only={["teacher"]} />}
-{tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
+{tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} onApplied={reloadIdentity} />}
 {tab === "schedule" && <Schedule sb={sb} canWrite={false} notify={notify} />}
 {tab === "take" && <><div className="preview-banner" style={{ background: "var(--accent-tint)", color: "var(--ink)" }}>🧪 โหมดตัวอย่าง — ทดลองการทำข้อสอบก่อนได้รับการแต่งตั้ง</div><DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("home")} /></>}
 {!allowed.includes(tab) && <div className="card"><p className="muted" style={{ margin: 0 }}>🔒 เมนูนี้จะเปิดใช้งานเมื่อได้รับการแต่งตั้งเป็นผู้ออกข้อสอบ</p></div>}
@@ -130,7 +131,7 @@ return (
 <StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} isCenterStaff={isCenterStaff} showApply={showApply} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canWrite={canWrite} onNavigate={setTab} only={superAdmin ? null : (canWrite || isReviewer || canSets || isAnalyst ? ["teacher"] : ["staff"])} />}
-{tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
+{tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} onApplied={reloadIdentity} />}
 {tab === "students" && isCenterStaff && <CenterStudents sb={sb} notify={notify} />}
 {tab === "dashboard" && canFullBank && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
@@ -161,7 +162,7 @@ const [apply, setApply] = useState(false);
 if (apply) return (
 <div className="login"><div className="box" style={{ maxWidth: 780, width: "100%", textAlign: "left" }}>
 <button className="btn ghost sm" onClick={() => { setApply(false); setMsg(""); onChanged(); }}>← กลับหน้าเข้าสู่ระบบ</button>
-<div style={{ marginTop: 12 }}><WriterApplication sb={sb} profile={profile} notify={(m) => setMsg(m)} /></div>
+<div style={{ marginTop: 12 }}><WriterApplication sb={sb} profile={profile} notify={(m) => setMsg(m)} onApplied={onChanged} /></div>
 {msg && <p className="delivery-sync" style={{ marginTop: 10 }}>{msg}</p>}
 <p className="muted" style={{ marginTop: 12 }}>เมื่อส่งใบสมัครแล้ว ผู้ดูแล (สพพ.) จะพิจารณาแต่งตั้ง จากนั้นบัญชีของคุณจะเข้าใช้งานได้</p>
 <button className="btn ghost sm" onClick={onSignOut} style={{ marginTop: 8 }}>ออกจากระบบ</button>
