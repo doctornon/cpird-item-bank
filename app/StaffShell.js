@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
-export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,canSets,onLock,onSignOut,children}) {
+export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,canSets,canFullBank,onLock,onSignOut,children}) {
  const [expanded,setExpanded]=useState(false);
  const [collapsed,setCollapsed]=useState(false);
  const [compact,setCompact]=useState(false);
@@ -16,8 +16,8 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
   window.addEventListener('keydown',escape);return()=>window.removeEventListener('keydown',escape);
  },[expanded]);
  const groups=[
-  ['ภาพรวม', [['home','หน้าแรก'],...(canApprove||canWrite?[['dashboard','แดชบอร์ด']]:[]),['schedule','กำหนดการ & ประกาศ ศรว.'],...(!canWrite?[['apply','สมัครเป็นผู้ออกข้อสอบ']]:[])]],
-  ['คลังข้อสอบ', [['bank','คลัง MCQ'],['meq','คลัง MEQ'],...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
+  ['ภาพรวม', [['home','หน้าแรก'],...(canFullBank?[['dashboard','แดชบอร์ด']]:[]),['schedule','กำหนดการ & ประกาศ ศรว.'],...(!canWrite?[['apply','สมัครเป็นผู้ออกข้อสอบ']]:[])]],
+  ['คลังข้อสอบ', [...(canFullBank?[['bank','คลัง MCQ'],['meq','คลัง MEQ']]:[]),...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
   ['ระบบทดสอบ', [...(canSets?[['sets','สร้างชุดข้อสอบ']]:[]),...(canApprove?[['assign','จัดรอบการสอบและตั้งค่า']]:[])]],
   ['ห้องสอบของฉัน', [['take','ทำข้อสอบ'],...(canApprove?[['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]:[])]],
   ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(canApprove?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['accounts','จัดการบัญชีผู้ใช้'],['roles','จัดการสิทธิ์']]:[])]]

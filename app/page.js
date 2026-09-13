@@ -75,6 +75,9 @@ setTasks(t.data || []); setSpecs(sp.data || []);
 const canWrite = superAdmin || roles.includes("committee") || roles.includes("item_writer");
 const canApprove = superAdmin || roles.includes("committee");
 const canSets = superAdmin || roles.includes("committee") || roles.includes("set_manager");
+// who may browse the SHARED item bank (matches the bank_items RLS read policy exactly);
+// a pure item_writer is excluded — they see only their own items via "คลังข้อสอบของฉัน"
+const canFullBank = superAdmin || roles.includes("committee") || roles.includes("registrar") || roles.includes("set_manager");
 const hasStaff = superAdmin || roles.length > 0;
 if (session === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
 if (!session) return <Login sb={sb} />;
@@ -95,13 +98,13 @@ return (
 if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
-<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} canSets={canSets} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} onNavigate={setTab} />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
-{tab === "dashboard" && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
-{tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
-{tab === "meq" && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
+{tab === "dashboard" && canFullBank && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
+{tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
+{tab === "meq" && canFullBank && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "mybank" && canWrite && <MyBank sb={sb} bp={bp} me={me} canWrite={canWrite} notify={notify} />}
 {canSets && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
@@ -147,11 +150,15 @@ return (
 </> : status === "revoked" ? <>
 <p className="delivery-alert" style={{ marginTop: 10 }}>บัญชีนี้ถูกระงับการเข้าใช้งานระบบคลังข้อสอบ โปรดติดต่อผู้ดูแลระบบ</p>
 </> : <>
-<p className="muted">ระบบนี้จำกัดเฉพาะผู้ได้รับอนุญาต (บัญชี <b>{profile?.email}</b>) — กด “ขอเข้าใช้งาน” เพื่อให้ผู้ดูแลอนุมัติ หรือกรอกรหัส/ลิงก์เชิญที่ได้รับ</p>
-<button className="btn" disabled={busy} onClick={() => setApply(true)} style={{ marginTop: 16, width: "100%" }}>✍️ สมัครเป็นผู้ออกข้อสอบ (อาจารย์แพทย์)</button>
-<button className="btn ghost" disabled={busy} onClick={request} style={{ marginTop: 8, width: "100%" }}>ขอเข้าใช้งานทั่วไป (รออนุมัติ)</button>
-<div style={{ margin: "14px 0 8px", textAlign: "center" }} className="muted">— หรือ —</div>
-<div className="row" style={{ gap: 6 }}><input placeholder="รหัสเชิญ หรือวางลิงก์เชิญ" value={code} onChange={(e) => { const v = e.target.value; setCode(v.includes("invite=") ? v.split("invite=")[1].split(/[&#]/)[0] : v); }} /><button className="btn" disabled={busy || !code.trim()} onClick={redeem}>ใช้รหัส</button></div>
+<p className="muted">ระบบคลังข้อสอบจำกัดเฉพาะผู้ได้รับอนุญาต (บัญชี <b>{profile?.email}</b>)</p>
+<button className="apply-hero" disabled={busy} onClick={() => setApply(true)}>
+<span className="apply-hero-ico" aria-hidden="true">✍️</span>
+<span className="apply-hero-txt"><b>สมัครเป็นผู้ออกข้อสอบ</b><span>สำหรับอาจารย์แพทย์ — ส่งใบสมัครให้ สพพ. พิจารณาแต่งตั้งเป็นคณะกรรมการออกข้อสอบ</span></span>
+<span className="apply-hero-arrow" aria-hidden="true">→</span>
+</button>
+<div style={{ margin: "16px 0 8px", textAlign: "center" }} className="muted">— หรือ สำหรับเจ้าหน้าที่ / นักศึกษา —</div>
+<button className="btn ghost sm" disabled={busy} onClick={request} style={{ width: "100%" }}>ขอเข้าใช้งานทั่วไป (รออนุมัติ)</button>
+<div className="row" style={{ gap: 6, marginTop: 8 }}><input placeholder="รหัสเชิญ หรือวางลิงก์เชิญ" value={code} onChange={(e) => { const v = e.target.value; setCode(v.includes("invite=") ? v.split("invite=")[1].split(/[&#]/)[0] : v); }} /><button className="btn ghost sm" disabled={busy || !code.trim()} onClick={redeem}>ใช้รหัส</button></div>
 </>}
 {msg && <p className="delivery-alert" style={{ marginTop: 10 }}>{msg}</p>}
 <button className="btn ghost sm" onClick={onSignOut} style={{ marginTop: 18 }}>ออกจากระบบ</button>

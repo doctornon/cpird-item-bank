@@ -416,3 +416,13 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 @container staff-workspace (max-width:560px){.dashboard-status-chart{flex-direction:column;align-items:stretch}.dashboard-status-chart>svg{align-self:center}.grid2,.bank-advanced{grid-template-columns:1fr}.workspace-heading{flex-wrap:wrap}.set-library-toolbar,.set-create-form{flex-wrap:wrap}.set-library-toolbar>label,.set-create-form>label{flex-basis:100%}.set-heading h1{font-size:26px}.set-panel{padding:16px}.set-progress{gap:16px}.set-steps>.btn{flex:1;min-width:120px}}
 @media(max-width:480px){.staff-shell{--staff-header-height:60px}.staff-header{padding:0 12px;gap:8px}.staff-header .brand{font-size:16px}.staff-header .grow{min-width:0}.staff-content{padding:0 16px}.staff-content>.section{padding:20px 0 40px}}
 @media print{.staff-header,.staff-nav,.staff-backdrop{display:none!important}.staff-body{display:block!important}.staff-content{padding:0!important;container-type:normal}.staff-content>.section{padding:0!important}}
+
+/* AccessGate — hero apply CTA (primary path for อาจารย์แพทย์) */
+.apply-hero{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;cursor:pointer;background:var(--accent);color:#fff;padding:14px 16px;border-radius:14px;box-shadow:0 6px 18px rgba(0,0,0,.14);transition:transform .12s,box-shadow .12s,background .12s;margin-top:16px}
+.apply-hero:hover{background:var(--accent-dark);transform:translateY(-1px);box-shadow:0 10px 24px rgba(0,0,0,.2)}
+.apply-hero:disabled{opacity:.6;cursor:default;transform:none}
+.apply-hero-ico{font-size:26px;line-height:1;flex:0 0 auto}
+.apply-hero-txt{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}
+.apply-hero-txt b{font-size:16px;font-weight:700}
+.apply-hero-txt span{font-size:12px;opacity:.92;line-height:1.35}
+.apply-hero-arrow{font-size:22px;opacity:.85;flex:0 0 auto}
