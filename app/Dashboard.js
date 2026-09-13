@@ -176,18 +176,18 @@ return (
 </div>
 <p className="muted" style={{ marginBottom: 12 }}>ช่องสีจาง/“–” คือยังไม่มีข้อ — ใช้วางแผนออกข้อสอบให้ครอบคลุม blueprint</p>
 <div className="tablewrap" style={{ boxShadow: "none" }}>
-<Heat cols={{ axis: "ภารกิจ", items: bp.tasks.map((t) => ({ label: t.name, title: t.name })) }}
-rows={bp.domains.map((d) => ({ label: d.code, title: d.title, sub: (d.title || "").replace(d.code, "").replace(/^[.\s]+/, "").slice(0, 18) }))}
+<Heat transpose cols={{ axis: "ภารกิจ", items: bp.tasks.map((t) => ({ label: t.name, title: t.name })) }}
+rows={bp.domains.map((d) => ({ label: d.code, title: d.title }))}
 matrix={covTask} />
 </div>
 </div>
 <div className="card" style={{ marginTop: 16 }}>
 <div className="mk" style={{ marginBottom: 4 }}>Coverage — หมวด NL × สาขา</div>
-<p className="muted" style={{ marginBottom: 12 }}>แสดงเฉพาะสาขาที่มีข้อสอบในคลัง — เลื่อนแนวนอนเพื่อดูทุกสาขา</p>
+<p className="muted" style={{ marginBottom: 12 }}>แสดงเฉพาะสาขาที่มีข้อสอบในคลัง — สาขาอยู่แนวตั้ง เลื่อนลงเพื่อดูทุกสาขา</p>
 {specsWithItems.length === 0 ? <div className="muted">ยังไม่มีข้อสอบที่ระบุสาขา</div> : (
 <div className="tablewrap" style={{ boxShadow: "none" }}>
-<Heat cols={{ axis: "สาขา", items: specsWithItems.map((s) => ({ label: s.name_en || s.name_th, title: s.name_th })) }}
-rows={bp.domains.map((d) => ({ label: d.code, title: d.title, sub: (d.title || "").replace(d.code, "").replace(/^[.\s]+/, "").slice(0, 18) }))}
+<Heat transpose cols={{ axis: "สาขา", items: specsWithItems.map((s) => ({ label: s.name_en || s.name_th, title: s.name_th })) }}
+rows={bp.domains.map((d) => ({ label: d.code, title: d.title }))}
 matrix={covSpec} />
 </div>
 )}
