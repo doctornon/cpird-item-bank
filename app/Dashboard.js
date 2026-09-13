@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { STATUS, STATUS_TH } from "../lib/constants";
-import Heat from "./Heat";
+import Heat, { domainLabel } from "./Heat";
 const STATUS_COLOR = { draft: "var(--draft)", review: "var(--review)", approved: "var(--approved)", retired: "var(--retired)" };
 function Donut({ segments, total }) {
 const R = 52, C = 2 * Math.PI * R;
@@ -177,7 +177,7 @@ return (
 <p className="muted" style={{ marginBottom: 12 }}>ช่องสีจาง/“–” คือยังไม่มีข้อ — ใช้วางแผนออกข้อสอบให้ครอบคลุม blueprint</p>
 <div className="tablewrap" style={{ boxShadow: "none" }}>
 <Heat transpose cols={{ axis: "ภารกิจ", items: bp.tasks.map((t) => ({ label: t.name, title: t.name })) }}
-rows={bp.domains.map((d) => ({ label: d.code, title: d.title }))}
+rows={bp.domains.map((d) => ({ label: domainLabel(d), title: d.title }))}
 matrix={covTask} />
 </div>
 </div>
@@ -187,7 +187,7 @@ matrix={covTask} />
 {specsWithItems.length === 0 ? <div className="muted">ยังไม่มีข้อสอบที่ระบุสาขา</div> : (
 <div className="tablewrap" style={{ boxShadow: "none" }}>
 <Heat transpose cols={{ axis: "สาขา", items: specsWithItems.map((s) => ({ label: s.name_en || s.name_th, title: s.name_th })) }}
-rows={bp.domains.map((d) => ({ label: d.code, title: d.title }))}
+rows={bp.domains.map((d) => ({ label: domainLabel(d), title: d.title }))}
 matrix={covSpec} />
 </div>
 )}

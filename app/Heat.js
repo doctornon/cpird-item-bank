@@ -1,4 +1,7 @@
 "use client";
+// English domain name (strip the roman-numeral prefix), sentence-cased: "III. Diagnosis" -> "Diagnosis",
+// "I. Health & Health Maintenance" -> "Health & health maintenance"; Thai titles (X) left unchanged.
+export const domainLabel = (d) => { const t = (d.title || d.code || "").replace(/^\s*[IVXLC]+\.\s*/, ""); return /^[A-Za-z]/.test(t) ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : t; };
 export default function Heat({ cols, rows, matrix, transpose }) {
 const max = Math.max(1, ...matrix.flat());
 const color = (v) => v === 0 ? "var(--surface-2)" : `color-mix(in srgb, var(--accent) ${Math.round((0.18 + 0.82 * (v / max)) * 100)}%, var(--surface))`;
