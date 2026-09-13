@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-const ROLES = [["item_writer", "ออกข้อสอบ"], ["reviewer", "คัดเลือก/วิพากษ์"], ["set_manager", "จัดทำชุด"], ["analyst", "วิเคราะห์ผล"], ["committee", "กรรมการ (รวม)"], ["registrar", "ทะเบียน"]];
+const ROLES = [["item_writer", "ออกข้อสอบ"], ["reviewer", "คัดเลือก/วิพากษ์"], ["set_manager", "จัดทำชุด"], ["analyst", "วิเคราะห์ผล"], ["center_staff", "จนท.ศูนย์"], ["committee", "กรรมการ (รวม)"], ["registrar", "ทะเบียน"]];
 const fmtDate = (s) => { if (!s) return "—"; const d = new Date(s); return isNaN(d) ? "—" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); };
 const sortCenters = (list) => [...list].sort((a, b) => ((b.short_name === "สพพ.") - (a.short_name === "สพพ.")) || (a.short_name || a.name_th).localeCompare(b.short_name || b.name_th, "th"));
 
@@ -64,6 +64,25 @@ export default function AccountsAdmin({ sb, me, notify }) {
     if (error) return notify("ผิดพลาด: " + error.message);
     setRows((rs) => rs.map((r) => r.id === uid ? { ...r, access_status: status, requested_at: r.requested_at || new Date().toISOString() } : r));
     notify(status === "approved" ? "อนุมัติให้เข้าใช้งานแล้ว" : status === "revoked" ? "บล็อคผู้ใช้แล้ว" : "อัปเดตแล้ว");
+  };
+
+  const cancelApp = async (r) => {
+    if (!confirm("ยกเลิกการเป็นผู้ออกข้อสอบของ " + (r.full_name || r.email) + " ?\n\n• ลบใบสมัคร และถอนสิทธิ์ผู้ออกข้อสอบ\n• ข้อสอบที่ออกไว้แล้วยังคงอยู่ในคลัง (ไม่ถูกลบ)")) return;
+    setBusy(true);
+    const { error } = await sb.rpc("exam_writer_cancel", { _uid: r.id });
+    setBusy(false);
+    if (error) return notify("ผิดพลาด: " + error.message);
+    notify("ยกเลิกการเป็นผู้ออกข้อสอบแล้ว"); load(q);
+  };
+  const removeAcct = async (r) => {
+    if (r.id === me) return notify("ลบบัญชีตนเองไม่ได้");
+    if (!confirm("ลบ " + (r.full_name || r.email) + " ออกจากระบบคลังข้อสอบ ?\n\n• ถอนสิทธิ์ทั้งหมด และบล็อกการเข้าใช้งานทันที\n• ไม่ลบบัญชี Google/LMS ที่ใช้ร่วมกัน\n• ไม่ลบข้อสอบที่บุคคลนี้ออกไว้แล้ว (ยังอยู่ในคลัง)")) return;
+    setBusy(true);
+    const { error } = await sb.rpc("exam_remove_from_system", { _uid: r.id });
+    setBusy(false);
+    if (error) return notify("ผิดพลาด: " + error.message);
+    setRows((rs) => rs.map((x) => x.id === r.id ? { ...x, access_status: "revoked", roles: [] } : x));
+    notify("ลบออกจากระบบคลังข้อสอบแล้ว"); load(q);
   };
 
   const createInvite = async () => {
@@ -179,6 +198,10 @@ export default function AccountsAdmin({ sb, me, notify }) {
                         {r.access_status !== "revoked" && <button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy || r.id === me} onClick={() => setAccess(r.id, "revoked")}>บล็อค</button>}
                         {r.access_status === "revoked" && <button className="btn ghost sm" disabled={busy} onClick={() => setAccess(r.id, "approved")}>ปลดบล็อค</button>}
                       </div>
+                      {r.id !== me && <div className="row" style={{ gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                        {(r.roles || []).includes("item_writer") && <button className="btn ghost sm" style={{ color: "var(--warn)" }} disabled={busy} onClick={() => cancelApp(r)}>ยกเลิกผู้ออกข้อสอบ</button>}
+                        <button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy} onClick={() => removeAcct(r)}>ลบออกจากระบบ</button>
+                      </div>}
                     </td>
                     <td>
                       <select value={r.medical_center_id || ""} disabled={busy} onChange={(e) => setCenter(r.id, e.target.value)} style={{ maxWidth: 190 }}>

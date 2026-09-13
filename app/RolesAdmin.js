@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-const ROLES = ["item_writer", "reviewer", "set_manager", "analyst", "committee", "registrar"];
+const ROLES = ["item_writer", "reviewer", "set_manager", "analyst", "center_staff", "committee", "registrar"];
 const ROLE_SHORT = {
 item_writer: "ออกข้อสอบ",
 reviewer: "คัดเลือก/วิพากษ์",
 set_manager: "จัดทำชุด",
 analyst: "วิเคราะห์ผล",
+center_staff: "เจ้าหน้าที่ศูนย์",
 committee: "กรรมการ (รวม)",
 registrar: "ทะเบียน",
 };
@@ -14,6 +15,7 @@ item_writer: "กรรมการออกข้อสอบ — ร่าง/
 reviewer: "กรรมการคัดเลือก/วิพากษ์ข้อสอบ — วิพากษ์และอนุมัติข้อเข้าคลังรวม",
 set_manager: "กรรมการจัดทำชุดข้อสอบ — สร้างชุด/คัดเลือกข้อเข้าชุด",
 analyst: "กรรมการวิเคราะห์ผลสอบ — ดูคะแนน/วิเคราะห์ผล/ประกาศนียบัตร",
+center_staff: "นักวิชาการ/เจ้าหน้าที่ศูนย์ — จัดการบัญชีนักศึกษาของศูนย์ตนเอง",
 committee: "กรรมการ (ครบทุกหน้าที่)",
 registrar: "ทะเบียน — ดูชุดข้อสอบและผลสอบ",
 };

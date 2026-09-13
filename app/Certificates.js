@@ -55,7 +55,7 @@ export default function Certificates({ sb, notify }) {
               <div className="cert-exam">{round?.title}</div>
               <p className="cert-score">คะแนน {p.score}/{p.max_score} · {p.percent != null ? Math.round(p.percent) : "—"}% (ผ่านเกณฑ์ {round?.pass_mark}%){p.center_name ? ` · ศูนย์แพทย์ ${p.center_name}` : ""}</p>
               <p className="cert-date">ณ วันที่ {fmt(p.submitted_at)}</p>
-              <div className="cert-org">ระบบจัดทดสอบและวัดผล สพพ. · สำนักงานบริหารโครงการร่วมผลิตแพทย์เพิ่มเพื่อชาวชนบท (สพพ.)</div>
+              <div className="cert-org">สำนักส่งเสริมสนับสนุนการผลิต พัฒนาแพทย์และบุคลากรทางการแพทย์ (สพพ.)</div>
             </div>
           ))}</div>
         </>}

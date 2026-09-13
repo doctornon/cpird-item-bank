@@ -17,6 +17,7 @@ import AccountsAdmin from "./AccountsAdmin";
 import Certificates from "./Certificates";
 import HomeCards from "./HomeCards";
 import WriterApplication from "./WriterApplication";
+import CenterStudents from "./CenterStudents";
 import DeliveryPortal from "./DeliveryPortal";
 import DeliveryManager from "./DeliveryManager";
 export default function Page() {
@@ -79,6 +80,8 @@ const canWrite = superAdmin || roles.includes("committee") || roles.includes("it
 const isReviewer = superAdmin || roles.includes("committee") || roles.includes("reviewer");      // กรรมการคัดเลือก/วิพากษ์
 const canSets = superAdmin || roles.includes("committee") || roles.includes("set_manager");      // กรรมการจัดทำชุด
 const isAnalyst = superAdmin || roles.includes("committee") || roles.includes("analyst");        // กรรมการวิเคราะห์ผล
+const isCenterStaff = superAdmin || roles.includes("center_staff");                              // นักวิชาการ/เจ้าหน้าที่ศูนย์
+const showApply = !(superAdmin || canWrite || isReviewer || canSets || isAnalyst || isCenterStaff);
 // จัดรอบการสอบ + ค่าตอบแทน = เจ้าหน้าที่ สพพ. (admin) เท่านั้น
 // who may browse the SHARED item bank (matches the bank_items RLS read policy) — pure item_writer excluded
 const canFullBank = superAdmin || roles.includes("committee") || roles.includes("reviewer") || roles.includes("set_manager") || roles.includes("analyst") || roles.includes("registrar");
@@ -124,10 +127,11 @@ return (
 if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
-<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} isCenterStaff={isCenterStaff} showApply={showApply} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canWrite={canWrite} onNavigate={setTab} only={superAdmin ? null : (canWrite || isReviewer || canSets || isAnalyst ? ["teacher"] : ["staff"])} />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} />}
+{tab === "students" && isCenterStaff && <CenterStudents sb={sb} notify={notify} />}
 {tab === "dashboard" && canFullBank && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
 {tab === "meq" && canFullBank && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
