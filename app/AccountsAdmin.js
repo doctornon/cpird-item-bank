@@ -1,26 +1,29 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 const ROLES = [["item_writer", "ผู้ออกข้อสอบ"], ["committee", "กรรมการ"], ["registrar", "ทะเบียน"]];
-const APPROVAL = { approved: "อนุมัติแล้ว", pending: "รออนุมัติ", rejected: "ไม่อนุมัติ", revision: "ขอแก้ไข" };
-const APPROVAL_CLS = { approved: "approved", pending: "draft", rejected: "retired", revision: "review" };
 const fmtDate = (s) => { if (!s) return "—"; const d = new Date(s); return isNaN(d) ? "—" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); };
+const sortCenters = (list) => [...list].sort((a, b) => ((b.short_name === "สพพ.") - (a.short_name === "สพพ.")) || (a.short_name || a.name_th).localeCompare(b.short_name || b.name_th, "th"));
 
 export default function AccountsAdmin({ sb, me, notify }) {
   const [rows, setRows] = useState([]);
   const [centers, setCenters] = useState([]);
   const [q, setQ] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
+  const [filter, setFilter] = useState("relevant");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [invites, setInvites] = useState([]);
+  const [showInv, setShowInv] = useState(false);
+  const [invForm, setInvForm] = useState({ label: "", days: "14", max: "" });
 
   const load = useCallback(async (term) => {
     setLoading(true);
-    const [{ data, error }, { data: mc }] = await Promise.all([
+    const [{ data, error }, { data: mc }, { data: inv }] = await Promise.all([
       sb.rpc("exam_user_accounts", { _q: term || null }),
-      sb.from("medical_centers").select("id,name_th,short_name").eq("is_active", true).order("display_order"),
+      sb.from("medical_centers").select("id,name_th,short_name").eq("is_active", true),
+      sb.rpc("exam_list_invites"),
     ]);
     if (error) { notify("โหลดบัญชีผู้ใช้ไม่สำเร็จ: " + error.message); setLoading(false); return; }
-    setRows(data || []); setCenters(mc || []); setLoading(false);
+    setRows(data || []); setCenters(sortCenters(mc || [])); setInvites(inv || []); setLoading(false);
   }, [sb, notify]);
   useEffect(() => { load(""); }, [load]);
 
@@ -41,53 +44,124 @@ export default function AccountsAdmin({ sb, me, notify }) {
     setRows((rs) => rs.map((r) => r.id === uid ? { ...r, roles: has ? (r.roles || []).filter((x) => x !== role) : [...(r.roles || []), role] } : r));
     notify("อัปเดตสิทธิ์แล้ว");
   };
+  const setAccess = async (uid, status) => {
+    if (status === "revoked" && !confirm("บล็อคผู้ใช้รายนี้? จะเข้าใช้ระบบคลังข้อสอบไม่ได้ทันที (สิทธิ์ staff ก็ถูกระงับด้วย)")) return;
+    setBusy(true);
+    const { error } = await sb.rpc("exam_set_access", { _uid: uid, _status: status });
+    setBusy(false);
+    if (error) return notify("ผิดพลาด: " + error.message);
+    setRows((rs) => rs.map((r) => r.id === uid ? { ...r, access_status: status, requested_at: r.requested_at || new Date().toISOString() } : r));
+    notify(status === "approved" ? "อนุมัติให้เข้าใช้งานแล้ว" : status === "revoked" ? "บล็อคผู้ใช้แล้ว" : "อัปเดตแล้ว");
+  };
 
-  const shown = rows.filter((r) => !roleFilter || (roleFilter === "staff" ? (r.roles || []).length > 0 : (r.roles || []).includes(roleFilter)));
-  const staffCount = rows.filter((r) => (r.roles || []).length > 0).length;
+  const createInvite = async () => {
+    setBusy(true);
+    const { data, error } = await sb.rpc("exam_create_invite", { _label: invForm.label || null, _days: Number(invForm.days) || 0, _max_uses: Number(invForm.max) || null });
+    setBusy(false);
+    if (error) return notify("สร้างลิงก์ไม่สำเร็จ: " + error.message);
+    setInvites((v) => [data, ...v]); setInvForm({ label: "", days: "14", max: "" });
+    notify("สร้างลิงก์เชิญแล้ว");
+  };
+  const toggleInvite = async (id, active) => {
+    setBusy(true);
+    const { error } = await sb.rpc("exam_set_invite_active", { _id: id, _active: !active });
+    setBusy(false);
+    if (error) return notify("ผิดพลาด: " + error.message);
+    setInvites((v) => v.map((x) => x.id === id ? { ...x, active: !active } : x));
+  };
+  const inviteLink = (code) => (typeof window !== "undefined" ? window.location.origin : "") + "/?invite=" + code;
+  const copyLink = (code) => { const t = inviteLink(code); if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => notify("คัดลอกลิงก์แล้ว"), () => notify(t)); else notify(t); };
+
+  const accessMeta = (r) => {
+    if (r.access_status === "approved") return { label: "ใช้งานได้", cls: "approved" };
+    if (r.access_status === "pending") return { label: "รออนุมัติ", cls: "draft" };
+    if (r.access_status === "revoked") return { label: "ถูกบล็อค", cls: "retired" };
+    if (r.is_staff) return { label: "staff (อัตโนมัติ)", cls: "mcq" };
+    return { label: "—", cls: "" };
+  };
+  const matchFilter = (r) => {
+    if (filter === "pending") return r.access_status === "pending";
+    if (filter === "approved") return r.access_status === "approved";
+    if (filter === "blocked") return r.access_status === "revoked";
+    if (filter === "staff") return (r.roles || []).length > 0 || r.is_staff;
+    if (filter === "relevant") return !!r.access_status || r.is_staff;
+    return true;
+  };
+  const shown = rows.filter(matchFilter);
+  const pendingN = rows.filter((r) => r.access_status === "pending").length;
 
   return (
     <div>
-      <div className="workspace-heading"><div><h2>จัดการบัญชีผู้ใช้</h2><p>กำหนดศูนย์แพทย์และสิทธิ์การใช้งานระบบคลังข้อสอบให้ผู้ใช้ · เฉพาะผู้ดูแลระบบเท่านั้น</p></div></div>
+      <div className="workspace-heading"><div><h2>จัดการบัญชีผู้ใช้</h2><p>อนุมัติ/บล็อคการเข้าใช้ระบบคลังข้อสอบ กำหนดศูนย์แพทย์และสิทธิ์ · การสมัครยึดตามการเข้าสู่ระบบในเว็บนี้ · เฉพาะผู้ดูแลระบบ</p></div>
+        <button className="btn" onClick={() => setShowInv((v) => !v)}>{showInv ? "ซ่อนลิงก์เชิญ" : "🔗 ลิงก์เชิญเข้าใช้งาน"}</button></div>
+
+      {showInv && <div className="card" style={{ marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0 }}>ลิงก์เชิญเข้าใช้งาน (กำหนดช่วงเวลาได้)</h3>
+        <p className="set-note">ใครก็ตามที่เปิดลิงก์นี้แล้วเข้าสู่ระบบ จะได้รับสิทธิ์เข้าใช้งานทันที (ภายในเวลาและจำนวนครั้งที่กำหนด) โดยไม่ต้องรออนุมัติ</p>
+        <div className="row" style={{ gap: 8, alignItems: "end", flexWrap: "wrap", margin: "8px 0 4px" }}>
+          <div className="search-field"><label>ชื่อลิงก์ (ไม่บังคับ)</label><input value={invForm.label} onChange={(e) => setInvForm({ ...invForm, label: e.target.value })} placeholder="เช่น กรรมการรอบ พ.ย. 69" /></div>
+          <div className="search-field"><label>อายุ (วัน)</label><input type="number" min="0" style={{ width: 100 }} value={invForm.days} onChange={(e) => setInvForm({ ...invForm, days: e.target.value })} placeholder="ไม่จำกัด" /></div>
+          <div className="search-field"><label>ใช้ได้กี่คน</label><input type="number" min="0" style={{ width: 110 }} value={invForm.max} onChange={(e) => setInvForm({ ...invForm, max: e.target.value })} placeholder="ไม่จำกัด" /></div>
+          <button className="btn" disabled={busy} onClick={createInvite}>สร้างลิงก์</button>
+        </div>
+        <div className="tablewrap" style={{ marginTop: 10 }}><table>
+          <thead><tr><th>ชื่อ</th><th>ลิงก์</th><th>หมดอายุ</th><th>ใช้แล้ว</th><th>สถานะ</th><th /></tr></thead>
+          <tbody>
+            {invites.length === 0 ? <tr><td colSpan={6}><div className="empty">ยังไม่มีลิงก์เชิญ</div></td></tr> :
+              invites.map((v) => <tr key={v.id}>
+                <td>{v.label || <span className="muted">(ไม่มีชื่อ)</span>}</td>
+                <td><code style={{ fontSize: 12 }}>…/?invite={v.code}</code></td>
+                <td className="muted" style={{ whiteSpace: "nowrap" }}>{v.expires_at ? fmtDate(v.expires_at) : "ไม่จำกัด"}</td>
+                <td>{v.used_count}{v.max_uses ? " / " + v.max_uses : ""}</td>
+                <td>{(() => { const expired = v.expires_at && new Date(v.expires_at) < new Date(); const full = v.max_uses && v.used_count >= v.max_uses; const ok = v.active && !expired && !full; return <span className={"pill " + (ok ? "approved" : "retired")}>{!v.active ? "ปิด" : expired ? "หมดอายุ" : full ? "ใช้ครบแล้ว" : "ใช้งานได้"}</span>; })()}</td>
+                <td><div className="row" style={{ gap: 4 }}><button className="btn ghost sm" disabled={busy} onClick={() => copyLink(v.code)}>คัดลอก</button><button className="btn ghost sm" disabled={busy} onClick={() => toggleInvite(v.id, v.active)}>{v.active ? "ปิด" : "เปิด"}</button></div></td>
+              </tr>)}
+          </tbody></table></div>
+      </div>}
 
       <div className="bank-search" style={{ alignItems: "end", flexWrap: "wrap", gap: 12 }}>
         <div className="search-field" style={{ flex: 1, minWidth: 220 }}><label htmlFor="ac-q">ค้นหา (ชื่อ / อีเมล / รหัสนักศึกษา)</label>
-          <input id="ac-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(q)} placeholder="พิมพ์แล้วกด Enter" /></div>
+          <input id="ac-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load(q)} placeholder="พิมพ์แล้วกด Enter — ค้นได้ทุกคนในฐานเพื่อเชิญ/อนุมัติ" /></div>
         <button className="btn" disabled={busy || loading} onClick={() => load(q)}>ค้นหา</button>
         {q && <button className="btn ghost" disabled={busy || loading} onClick={() => { setQ(""); load(""); }}>ล้าง</button>}
       </div>
       <div className="bank-status" role="tablist" style={{ marginTop: 8 }}>
-        {[["", "ทั้งหมด"], ["staff", "มีสิทธิ์ (staff)"], ...ROLES.map(([v, l]) => [v, l])].map(([v, l]) =>
-          <button key={v || "all"} className={"status-filter" + (roleFilter === v ? " selected" : "")} aria-pressed={roleFilter === v} onClick={() => setRoleFilter(v)}>{l}</button>)}
+        {[["relevant", "เกี่ยวข้องกับระบบ"], ["pending", "รออนุมัติ" + (pendingN ? " (" + pendingN + ")" : "")], ["approved", "อนุมัติแล้ว"], ["blocked", "ถูกบล็อค"], ["staff", "มีสิทธิ์ (staff)"], ["all", "ทั้งหมด"]].map(([v, l]) =>
+          <button key={v} className={"status-filter" + (filter === v ? " selected" : "")} aria-pressed={filter === v} onClick={() => setFilter(v)}>{l}</button>)}
       </div>
-      <p className="set-note" style={{ marginTop: 6 }}>แสดง {shown.length} จาก {rows.length} บัญชี · มีสิทธิ์ในระบบคลังข้อสอบ {staffCount} คน{rows.length >= 1000 ? " · แสดงสูงสุด 1000 รายการ ใช้ช่องค้นหาเพื่อจำกัด" : ""}</p>
+      <p className="set-note" style={{ marginTop: 6 }}>แสดง {shown.length} รายการ · รออนุมัติ {pendingN} คน{q ? "" : " · ค่าเริ่มต้นแสดงเฉพาะผู้ที่เกี่ยวข้องกับระบบ (เคยเข้าใช้/มีสิทธิ์) — ใช้ช่องค้นหาเพื่อหาคนอื่นในฐาน"}</p>
 
       {loading ? <p className="muted" role="status">กำลังโหลด…</p> :
         <div className="tablewrap">
           <table>
-            <thead><tr><th>ผู้ใช้</th><th>ศูนย์แพทย์</th>{ROLES.map(([v, l]) => <th key={v} style={{ textAlign: "center" }}>{l}</th>)}<th>สถานะบัญชี</th><th>สมัครเมื่อ</th></tr></thead>
+            <thead><tr><th>ผู้ใช้</th><th>การเข้าใช้ระบบ</th><th>ศูนย์แพทย์</th>{ROLES.map(([v, l]) => <th key={v} style={{ textAlign: "center" }}>{l}</th>)}<th>สมัคร/เข้าใช้เมื่อ</th></tr></thead>
             <tbody>
-              {shown.length === 0 ? <tr><td colSpan={4 + ROLES.length}><div className="empty">ไม่พบบัญชีผู้ใช้</div></td></tr> :
-                shown.map((r) => (
+              {shown.length === 0 ? <tr><td colSpan={5 + ROLES.length}><div className="empty">ไม่พบบัญชีผู้ใช้</div></td></tr> :
+                shown.map((r) => { const am = accessMeta(r); return (
                   <tr key={r.id}>
                     <td>{r.full_name || "(ไม่มีชื่อ)"}{r.id === me ? " (คุณ)" : ""}<br /><span className="muted">{r.email}</span></td>
+                    <td>
+                      <span className={"pill " + am.cls} style={{ marginRight: 6 }}>{am.label}</span>
+                      <div className="row" style={{ gap: 4, marginTop: 6, flexWrap: "wrap" }}>
+                        {r.access_status !== "approved" && <button className="btn ghost sm" disabled={busy || r.id === me} onClick={() => setAccess(r.id, "approved")}>อนุมัติ</button>}
+                        {r.access_status !== "revoked" && <button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy || r.id === me} onClick={() => setAccess(r.id, "revoked")}>บล็อค</button>}
+                        {r.access_status === "revoked" && <button className="btn ghost sm" disabled={busy} onClick={() => setAccess(r.id, "approved")}>ปลดบล็อค</button>}
+                      </div>
+                    </td>
                     <td>
                       <select value={r.medical_center_id || ""} disabled={busy} onChange={(e) => setCenter(r.id, e.target.value)} style={{ maxWidth: 190 }}>
                         <option value="">— ไม่ระบุ —</option>
                         {centers.map((c) => <option key={c.id} value={c.id}>{c.short_name || c.name_th}</option>)}
                       </select>
                     </td>
-                    {ROLES.map(([role]) => {
-                      const has = (r.roles || []).includes(role);
-                      return <td key={role} style={{ textAlign: "center" }}><input type="checkbox" style={{ width: "auto" }} checked={has} disabled={busy} onChange={() => toggleRole(r.id, role, has)} /></td>;
-                    })}
-                    <td>{r.approval_status ? <span className={"pill " + (APPROVAL_CLS[r.approval_status] || "")}>{APPROVAL[r.approval_status] || r.approval_status}</span> : <span className="muted">—</span>}</td>
-                    <td className="muted" style={{ whiteSpace: "nowrap" }}>{fmtDate(r.created_at)}</td>
+                    {ROLES.map(([role]) => { const has = (r.roles || []).includes(role); return <td key={role} style={{ textAlign: "center" }}><input type="checkbox" style={{ width: "auto" }} checked={has} disabled={busy} onChange={() => toggleRole(r.id, role, has)} /></td>; })}
+                    <td className="muted" style={{ whiteSpace: "nowrap" }}>{fmtDate(r.requested_at)}</td>
                   </tr>
-                ))}
+                ); })}
             </tbody>
           </table>
         </div>}
-      <p className="set-note" style={{ marginTop: 10 }}>สิทธิ์: <b>ผู้ออกข้อสอบ</b> = สร้าง/นำเข้าข้อสอบ · <b>กรรมการ</b> = วิพากษ์/อนุมัติ/จัดชุด/จัดรอบสอบ/ดูคะแนน · <b>ทะเบียน</b> = ดูชุดข้อสอบ · ผู้ดูแลระบบ (super admin) มีสิทธิ์ทุกอย่างอยู่แล้ว · “สถานะบัญชี” มาจากระบบสมัครของ LMS (แก้ที่ LMS)</p>
+      <p className="set-note" style={{ marginTop: 10 }}>สิทธิ์: <b>ผู้ออกข้อสอบ</b> = สร้าง/นำเข้าข้อสอบ · <b>กรรมการ</b> = วิพากษ์/อนุมัติ/จัดชุด/จัดรอบสอบ/ดูคะแนน · <b>ทะเบียน</b> = ดูชุดข้อสอบ · การให้สิทธิ์ staff จะอนุมัติการเข้าใช้งานให้อัตโนมัติ · “บล็อค” ระงับการเข้าใช้ทันทีแม้มีสิทธิ์ staff (ยกเว้นผู้ดูแลระบบ)</p>
     </div>
   );
 }

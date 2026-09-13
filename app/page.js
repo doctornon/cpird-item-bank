@@ -22,6 +22,7 @@ const [session, setSession] = useState(undefined);
 const [profile, setProfile] = useState(null);
 const [roles, setRoles] = useState([]);
 const [superAdmin, setSuperAdmin] = useState(false);
+const [access, setAccess] = useState(undefined);
 const [locked, setLocked] = useState(false);
 const [tab, setTab] = useState("dashboard");
 const [bankStatus, setBankStatus] = useState("");
@@ -50,6 +51,11 @@ sb.rpc("auth_is_super_admin"),
 setProfile(prof || { email: session.user.email });
 setRoles((rr || []).map((x) => x.role));
 setSuperAdmin(!!sa);
+// item-bank access gate — the shared auth base includes students, so entry requires approval or an invite
+let inviteCode = null; try { inviteCode = new URL(window.location.href).searchParams.get("invite"); } catch {}
+if (inviteCode) { try { await sb.rpc("exam_redeem_invite", { _code: inviteCode }); } catch {} try { const u = new URL(window.location.href); u.searchParams.delete("invite"); window.history.replaceState({}, "", u.pathname + u.search + u.hash); } catch {} }
+const { data: acc } = await sb.rpc("exam_my_access");
+setAccess(acc || { access: false });
 const [d, s, t, sp] = await Promise.all([
 sb.from("nl_domains").select("*").order("sort_order"),
 sb.from("nl_subitems").select("*").order("sort_order"),
@@ -67,7 +73,8 @@ if (session === undefined) return <div className="login"><div className="muted">
 if (!session) return <Login sb={sb} />;
 const bp = { domains, subitems, tasks, specs };
 const me = session.user.id;
-if (profile === null) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
+if (profile === null || access === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
+if (!access.access) return <AccessGate sb={sb} status={access.status} profile={profile} onSignOut={() => sb.auth.signOut()} onChanged={async () => { const { data: a } = await sb.rpc("exam_my_access"); setAccess(a || { access: false }); }} />;
 if (superAdmin && locked) return <LockScreen onUnlock={() => setLockedPersist(false)} />;
 // Non-staff users (students) get the exam-taking portal
 if (!hasStaff) {
@@ -100,6 +107,32 @@ return (
 </StaffShell>
 {toast && <div className="toast">{toast}</div>}
 </>
+);
+}
+function AccessGate({ sb, status, profile, onSignOut, onChanged }) {
+const [busy, setBusy] = useState(false);
+const [code, setCode] = useState("");
+const [msg, setMsg] = useState("");
+const request = async () => { setBusy(true); setMsg(""); const { error } = await sb.rpc("exam_request_access"); setBusy(false); if (error) return setMsg("เกิดข้อผิดพลาด: " + error.message); await onChanged(); };
+const redeem = async () => { if (!code.trim()) return; setBusy(true); setMsg(""); const { data, error } = await sb.rpc("exam_redeem_invite", { _code: code.trim() }); setBusy(false); if (error) return setMsg(error.message); if (data && data.ok === false) return setMsg(data.error || "ลิงก์เชิญไม่ถูกต้อง"); await onChanged(); };
+return (
+<div className="login"><div className="box" style={{ maxWidth: 460 }}>
+<img src="/cpird-logo.png" alt="CPIRD" style={{ height: 84, width: "auto", display: "block", margin: "0 auto 12px" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
+<h2 style={{ color: "var(--accent)", marginBottom: 8 }}>ระบบคลังข้อสอบ CPIRD</h2>
+{status === "pending" ? <>
+<p className="muted">บัญชี <b>{profile?.email}</b> ได้ส่งคำขอเข้าใช้งานแล้ว กรุณารอผู้ดูแลระบบอนุมัติ แล้วเข้าสู่ระบบอีกครั้ง</p>
+<button className="btn ghost" disabled={busy} onClick={onChanged} style={{ marginTop: 14 }}>ตรวจสอบสถานะอีกครั้ง</button>
+</> : status === "revoked" ? <>
+<p className="delivery-alert" style={{ marginTop: 10 }}>บัญชีนี้ถูกระงับการเข้าใช้งานระบบคลังข้อสอบ โปรดติดต่อผู้ดูแลระบบ</p>
+</> : <>
+<p className="muted">ระบบนี้จำกัดเฉพาะผู้ได้รับอนุญาต (บัญชี <b>{profile?.email}</b>) — กด “ขอเข้าใช้งาน” เพื่อให้ผู้ดูแลอนุมัติ หรือกรอกรหัส/ลิงก์เชิญที่ได้รับ</p>
+<button className="btn" disabled={busy} onClick={request} style={{ marginTop: 16, width: "100%" }}>ขอเข้าใช้งาน (รออนุมัติ)</button>
+<div style={{ margin: "14px 0 8px", textAlign: "center" }} className="muted">— หรือ —</div>
+<div className="row" style={{ gap: 6 }}><input placeholder="รหัสเชิญ หรือวางลิงก์เชิญ" value={code} onChange={(e) => { const v = e.target.value; setCode(v.includes("invite=") ? v.split("invite=")[1].split(/[&#]/)[0] : v); }} /><button className="btn" disabled={busy || !code.trim()} onClick={redeem}>ใช้รหัส</button></div>
+</>}
+{msg && <p className="delivery-alert" style={{ marginTop: 10 }}>{msg}</p>}
+<button className="btn ghost sm" onClick={onSignOut} style={{ marginTop: 18 }}>ออกจากระบบ</button>
+</div></div>
 );
 }
 function LockScreen({ onUnlock }) {
