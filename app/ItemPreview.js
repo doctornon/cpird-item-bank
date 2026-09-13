@@ -206,7 +206,7 @@ return (
 {canApprove && item.status === "retired" && <button className="btn ghost sm" style={{ color: "var(--good)" }} onClick={() => setStatus("approved", "นำกลับเข้าคลัง")} disabled={busy}>↩ นำกลับเข้าคลัง</button>}
 {canApprove && <button className="btn ghost sm" style={{ color: "var(--stop)" }} onClick={del} disabled={busy}>🗑 ลบ</button>}
 </div>
-{canWrite && <button className="btn" onClick={onEdit}>แก้ไข</button>}
+{canWrite && onEdit && <button className="btn" onClick={onEdit}>แก้ไข</button>}
 </div>
 </div>
 </div>
