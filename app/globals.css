@@ -456,3 +456,6 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 /* consolidated consent terms list */
 .consent-list{margin:10px 0 2px;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 .consent-list li{font-size:13px;line-height:1.65;color:var(--ink-soft)}
+
+/* appoint role picker (AccountsAdmin) */
+.appoint-pop{border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface-2);min-width:210px;box-shadow:var(--shadow-1)}

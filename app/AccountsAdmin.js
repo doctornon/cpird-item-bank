@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 const ROLES = [["item_writer", "ออกข้อสอบ"], ["reviewer", "คัดเลือก/วิพากษ์"], ["set_manager", "จัดทำชุด"], ["analyst", "วิเคราะห์ผล"], ["center_staff", "จนท.ศูนย์"], ["committee", "กรรมการ (รวม)"], ["registrar", "ทะเบียน"]];
+const APPOINT_ROLES = [["item_writer", "กรรมการออกข้อสอบ"], ["reviewer", "กรรมการคัดเลือก/วิพากษ์"], ["set_manager", "กรรมการจัดทำชุด"], ["analyst", "กรรมการวิเคราะห์ผล"], ["committee", "กรรมการ (รวมทุกหน้าที่)"]];
 const fmtDate = (s) => { if (!s) return "—"; const d = new Date(s); return isNaN(d) ? "—" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); };
 const sortCenters = (list) => [...list].sort((a, b) => ((b.short_name === "สพพ.") - (a.short_name === "สพพ.")) || (a.short_name || a.name_th).localeCompare(b.short_name || b.name_th, "th"));
 
@@ -16,6 +17,7 @@ export default function AccountsAdmin({ sb, me, notify }) {
   const [invForm, setInvForm] = useState({ label: "", days: "14", max: "" });
   const [apps, setApps] = useState([]);
   const [showApps, setShowApps] = useState(false);
+  const [appointFor, setAppointFor] = useState(null);
 
   const load = useCallback(async (term) => {
     setLoading(true);
@@ -138,10 +140,14 @@ export default function AccountsAdmin({ sb, me, notify }) {
             <td>{a.center_name || "—"}</td>
             <td>{a.specialties || "—"}</td>
             <td><span className={"pill " + (a.status === "appointed" ? "approved" : a.status === "rejected" ? "retired" : "draft")}>{a.status === "appointed" ? "แต่งตั้งแล้ว" : a.status === "rejected" ? "ปฏิเสธ" : "รอพิจารณา"}</span>{(a.roles || []).length ? <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>สิทธิ์: {(a.roles || []).join(", ")}</div> : null}</td>
-            <td><div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
-              {a.status !== "appointed" && <><button className="btn ghost sm" disabled={busy} onClick={() => decideApp(a.user_id, "appointed", "item_writer")}>แต่งตั้ง: ผู้ออกข้อสอบ</button><button className="btn ghost sm" disabled={busy} onClick={() => decideApp(a.user_id, "appointed", "committee")}>แต่งตั้ง: กรรมการ</button></>}
+            <td>{appointFor === a.user_id ? <div className="appoint-pop">
+              <p className="muted" style={{ margin: "0 0 6px", fontSize: 12 }}>แต่งตั้งเป็น (เลือกบทบาท) — เพิ่มบทบาทอื่นภายหลังได้ที่ตารางด้านล่าง</p>
+              {APPOINT_ROLES.map(([role, label]) => <button key={role} className="btn ghost sm" style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 4 }} disabled={busy} onClick={() => { setAppointFor(null); decideApp(a.user_id, "appointed", role); }}>{label}</button>)}
+              <button className="btn ghost sm" style={{ marginTop: 2 }} onClick={() => setAppointFor(null)}>ยกเลิก</button>
+            </div> : <div className="row" style={{ gap: 4, flexWrap: "wrap" }}>
+              {a.status !== "appointed" && <button className="btn ghost sm" disabled={busy} onClick={() => setAppointFor(a.user_id)}>✔ แต่งตั้ง ▾</button>}
               {a.status !== "rejected" && <button className="btn ghost sm" style={{ color: "var(--stop)" }} disabled={busy} onClick={() => decideApp(a.user_id, "rejected")}>ปฏิเสธ</button>}
-            </div></td>
+            </div>}</td>
           </tr>)}</tbody>
         </table></div>}
       </div>}
