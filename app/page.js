@@ -33,6 +33,9 @@ const [tasks, setTasks] = useState([]);
 const [specs, setSpecs] = useState([]);
 const notify = useCallback((m) => { setToast(m); setTimeout(() => setToast(""), 3200); }, []);
 useEffect(() => { try { setLocked(localStorage.getItem("cpird_locked") === "1"); } catch {} }, []);
+// remember the current view so a browser refresh stays on the same page instead of jumping home
+useEffect(() => { try { const t = localStorage.getItem("cpird_tab"); if (t) setTab(t); } catch {} }, []);
+useEffect(() => { try { localStorage.setItem("cpird_tab", tab); } catch {} }, [tab]);
 const setLockedPersist = (v) => { setLocked(v); try { localStorage.setItem("cpird_locked", v ? "1" : "0"); } catch {} };
 useEffect(() => {
 sb.auth.getSession().then(({ data }) => setSession(data.session || null));
