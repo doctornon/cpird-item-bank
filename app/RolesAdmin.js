@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-const ROLES = ["item_writer", "committee", "registrar"];
+const ROLES = ["item_writer", "committee", "set_manager", "registrar"];
 const ROLE_TH = {
 item_writer: "ผู้ออกข้อสอบ",
 committee: "กรรมการ (วิพากษ์/อนุมัติ/ชุดข้อสอบ)",
+set_manager: "จัดชุดข้อสอบ (สร้างชุด/คัดเลือกข้อ)",
 registrar: "ทะเบียน (ดูชุดข้อสอบ)",
 };
 export default function RolesAdmin({ sb, me, notify }) {
@@ -53,7 +54,7 @@ return (
 <table>
 <thead><tr><th>ผู้ใช้</th>{ROLES.map((r) => <th key={r} style={{ textAlign: "center" }}>{ROLE_TH[r].split(" ")[0]}</th>)}</tr></thead>
 <tbody>
-{searched && results.length === 0 && <tr><td colSpan={4}><div className="empty">ไม่พบผู้ใช้</div></td></tr>}
+{searched && results.length === 0 && <tr><td colSpan={ROLES.length + 1}><div className="empty">ไม่พบผู้ใช้</div></td></tr>}
 {results.map((u) => {
 const rs = rolesOf(u.id);
 return (

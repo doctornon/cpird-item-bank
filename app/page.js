@@ -72,6 +72,7 @@ setTasks(t.data || []); setSpecs(sp.data || []);
 }, [session, sb]);
 const canWrite = superAdmin || roles.includes("committee") || roles.includes("item_writer");
 const canApprove = superAdmin || roles.includes("committee");
+const canSets = superAdmin || roles.includes("committee") || roles.includes("set_manager");
 const hasStaff = superAdmin || roles.length > 0;
 if (session === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
 if (!session) return <Login sb={sb} />;
@@ -92,13 +93,13 @@ return (
 if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
-<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} canApprove={canApprove} canWrite={canWrite} canSets={canSets} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "dashboard" && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "meq" && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={canApprove} notify={notify} />}
 {tab === "mybank" && canWrite && <MyBank sb={sb} bp={bp} me={me} canWrite={canWrite} notify={notify} />}
-{canApprove && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
+{canSets && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && canApprove && <DeliveryManager sb={sb} />}
 {tab === "theater" && canApprove && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
 {tab === "scores" && canApprove && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="people" />}

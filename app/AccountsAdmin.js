@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-const ROLES = [["item_writer", "ผู้ออกข้อสอบ"], ["committee", "กรรมการ"], ["registrar", "ทะเบียน"]];
+const ROLES = [["item_writer", "ผู้ออกข้อสอบ"], ["committee", "กรรมการ"], ["set_manager", "จัดชุดข้อสอบ"], ["registrar", "ทะเบียน"]];
 const fmtDate = (s) => { if (!s) return "—"; const d = new Date(s); return isNaN(d) ? "—" : d.toLocaleDateString("th-TH", { year: "numeric", month: "short", day: "numeric" }); };
 const sortCenters = (list) => [...list].sort((a, b) => ((b.short_name === "สพพ.") - (a.short_name === "สพพ.")) || (a.short_name || a.name_th).localeCompare(b.short_name || b.name_th, "th"));
 
@@ -161,7 +161,7 @@ export default function AccountsAdmin({ sb, me, notify }) {
             </tbody>
           </table>
         </div>}
-      <p className="set-note" style={{ marginTop: 10 }}>สิทธิ์: <b>ผู้ออกข้อสอบ</b> = สร้าง/นำเข้าข้อสอบ · <b>กรรมการ</b> = วิพากษ์/อนุมัติ/จัดชุด/จัดรอบสอบ/ดูคะแนน · <b>ทะเบียน</b> = ดูชุดข้อสอบ · การให้สิทธิ์ staff จะอนุมัติการเข้าใช้งานให้อัตโนมัติ · “บล็อค” ระงับการเข้าใช้ทันทีแม้มีสิทธิ์ staff (ยกเว้นผู้ดูแลระบบ)</p>
+      <p className="set-note" style={{ marginTop: 10 }}>สิทธิ์: <b>ผู้ออกข้อสอบ</b> = สร้าง/นำเข้าข้อสอบ · <b>กรรมการ</b> = วิพากษ์/อนุมัติ/จัดชุด/จัดรอบสอบ/ดูคะแนน · <b>จัดชุดข้อสอบ</b> = สร้างชุดและคัดเลือกข้อเข้าชุด (ไม่รวมอนุมัติ) · <b>ทะเบียน</b> = ดูชุดข้อสอบ · การให้สิทธิ์ staff จะอนุมัติการเข้าใช้งานให้อัตโนมัติ · “บล็อค” ระงับการเข้าใช้ทันทีแม้มีสิทธิ์ staff (ยกเว้นผู้ดูแลระบบ)</p>
     </div>
   );
 }

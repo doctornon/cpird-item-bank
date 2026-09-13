@@ -1,6 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
-export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,onLock,onSignOut,children}) {
+export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,canApprove,canWrite,canSets,onLock,onSignOut,children}) {
  const [expanded,setExpanded]=useState(false);
  const [collapsed,setCollapsed]=useState(false);
  const [compact,setCompact]=useState(false);
@@ -18,7 +18,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
  const groups=[
   ['ภาพรวม', [['dashboard','แดชบอร์ด'],['schedule','กำหนดการ & ประกาศ ศรว.']]],
   ['คลังข้อสอบ', [['bank','คลัง MCQ'],['meq','คลัง MEQ'],...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
-  ['ระบบทดสอบ', canApprove?[['sets','สร้างชุดข้อสอบ'],['assign','จัดรอบการสอบและตั้งค่า']]:[]],
+  ['ระบบทดสอบ', [...(canSets?[['sets','สร้างชุดข้อสอบ']]:[]),...(canApprove?[['assign','จัดรอบการสอบและตั้งค่า']]:[])]],
   ['ห้องสอบของฉัน', [['take','ทำข้อสอบ'],...(canApprove?[['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]:[])]],
   ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(canApprove?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['accounts','จัดการบัญชีผู้ใช้'],['roles','จัดการสิทธิ์']]:[])]]
  ];
