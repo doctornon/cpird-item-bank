@@ -161,6 +161,7 @@ export default function MyBank({ sb, bp, me, canWrite, notify }) {
 
   return (
     <>
+      <a className="ai-badge" href="https://examprompt.vercel.app/" target="_blank" rel="noopener noreferrer"><img className="ai-badge-logo" src="/cpird-logo.png" alt="" onError={(e) => { e.currentTarget.style.display = "none"; }} /><span className="ai-badge-text"><b>MCQ Prompt AI Builder <span className="ai-chip">✨ AI</span></b><span>ผู้ช่วยสร้าง prompt ออกข้อสอบ MCQ ด้วย AI ตาม Blueprint ศรว.</span></span><span className="ai-badge-cta">เปิดแพลตฟอร์ม ↗</span></a>
       <div className="workspace-heading">
         <div><h2>คลังข้อสอบของฉัน</h2><p>ที่เก็บข้อสอบส่วนตัวของคุณ — ร่างไว้ก่อน ยังไม่เข้าคลังจริง แล้วค่อยกด “ส่งเข้าคลังจริง” เมื่อพร้อม</p></div>
         {canWrite && <div className="row" style={{ gap: 6 }}>
