@@ -24,7 +24,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,i
  },[expanded]);
  const groups=preview?PREVIEW_GROUPS:[
   ['ภาพรวม', [['home','หน้าแรก'],...(canFullBank?[['dashboard','แดชบอร์ด']]:[]),['schedule','กำหนดการ & ประกาศ ศรว.'],...(showApply?[['apply','สมัครเป็นผู้ออกข้อสอบ']]:[])]],
-  ['ศูนย์แพทย์ของฉัน', [...(isCenterStaff?[['students','บัญชีนักศึกษาของศูนย์']]:[])]],
+  ['ศูนย์แพทย์ของฉัน', [...(isCenterStaff?[['students','บัญชีนักศึกษาของศูนย์'],['announce','ประกาศสนามสอบ']]:[])]],
   ['คลังข้อสอบ', [...(canFullBank?[['bank','คลัง MCQ'],['meq','คลัง MEQ']]:[]),...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(isReviewer?[['theater','วิพากษ์ข้อสอบ']]:[])]],
   ['ระบบทดสอบ', [...(canSets?[['sets','สร้างชุดข้อสอบ']]:[]),...(superAdmin?[['assign','จัดรอบการสอบและตั้งค่า']]:[])]],
   ['ห้องสอบของฉัน', [['take','ทำข้อสอบ'],...(isAnalyst?[['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]:[])]],

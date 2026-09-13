@@ -14,7 +14,7 @@ export default function HomeCards({ profile, roles = [], superAdmin, canWrite, o
       key: "staff", icon: "🗂️", tone: "b",
       title: "นักวิชาการศึกษา / เจ้าหน้าที่ศูนย์แพทย์",
       bullets: ["จัดการบัญชีนักศึกษาของศูนย์ตนเอง", "ดูปฏิทินสอบ", "ดูและพิมพ์ประกาศสนามสอบ", "การเตรียมตัวสอบและระบบจัดการการสอบ"],
-      actions: [["บัญชีนักศึกษาของศูนย์", () => onNavigate("students"), true], ["ปฏิทิน & ประกาศ ศรว.", () => onNavigate("schedule")]],
+      actions: [["บัญชีนักศึกษาของศูนย์", () => onNavigate("students"), true], ["ประกาศสนามสอบ", () => onNavigate("announce")], ["ปฏิทินสอบ", () => onNavigate("schedule")]],
     },
     {
       key: "admin", icon: "🛡️", tone: "c",

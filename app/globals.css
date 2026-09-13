@@ -459,3 +459,12 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 
 /* appoint role picker (AccountsAdmin) */
 .appoint-pop{border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--surface-2);min-width:210px;box-shadow:var(--shadow-1)}
+
+/* print: exam-site announcement + center roster */
+@media print {
+  .staff-header, .staff-nav, .staff-backdrop, .no-print, .toast { display:none !important; }
+  .staff-body, .staff-content, .section, .staff-shell { display:block !important; padding:0 !important; margin:0 !important; background:#fff !important; }
+  .card, .announce { box-shadow:none !important; border:none !important; padding:0 !important; }
+  .tablewrap { overflow:visible !important; }
+  th { background:#eee !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}

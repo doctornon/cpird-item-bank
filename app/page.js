@@ -18,6 +18,8 @@ import Certificates from "./Certificates";
 import HomeCards from "./HomeCards";
 import WriterApplication from "./WriterApplication";
 import CenterStudents from "./CenterStudents";
+import CenterAnnouncements from "./CenterAnnouncements";
+import StudentConsent from "./StudentConsent";
 import DeliveryPortal from "./DeliveryPortal";
 import DeliveryManager from "./DeliveryManager";
 export default function Page() {
@@ -28,6 +30,7 @@ const [roles, setRoles] = useState([]);
 const [superAdmin, setSuperAdmin] = useState(false);
 const [access, setAccess] = useState(undefined);
 const [writerApp, setWriterApp] = useState(null);
+const [studentConsent, setStudentConsent] = useState(undefined);
 const [locked, setLocked] = useState(false);
 const [tab, setTab] = useState("home");
 const [bankStatus, setBankStatus] = useState("");
@@ -62,9 +65,10 @@ setSuperAdmin(!!sa);
 // item-bank access gate — the shared auth base includes students, so entry requires approval or an invite
 let inviteCode = null; try { inviteCode = new URL(window.location.href).searchParams.get("invite"); } catch {}
 if (inviteCode) { try { await sb.rpc("exam_redeem_invite", { _code: inviteCode }); } catch {} try { const u = new URL(window.location.href); u.searchParams.delete("invite"); window.history.replaceState({}, "", u.pathname + u.search + u.hash); } catch {} }
-const [{ data: acc }, { data: wa }] = await Promise.all([sb.rpc("exam_my_access"), sb.rpc("exam_writer_my")]);
+const [{ data: acc }, { data: wa }, { data: sc }] = await Promise.all([sb.rpc("exam_my_access"), sb.rpc("exam_writer_my"), sb.rpc("student_consent_my")]);
 setAccess(acc || { access: false });
 setWriterApp(wa || null);
+setStudentConsent(sc || null);
 const [d, s, t, sp] = await Promise.all([
 sb.from("nl_domains").select("*").order("sort_order"),
 sb.from("nl_subitems").select("*").order("sort_order"),
@@ -116,8 +120,10 @@ return (
 return <AccessGate sb={sb} status={access.status} profile={profile} onSignOut={() => sb.auth.signOut()} onChanged={refreshAccess} />;
 }
 if (superAdmin && locked) return <LockScreen onUnlock={() => setLockedPersist(false)} />;
-// Non-staff users (students) get the exam-taking portal
+// Non-staff users (students) get the exam-taking portal — after a one-time consent
 if (!hasStaff) {
+if (studentConsent === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
+if (!studentConsent) return <StudentConsent sb={sb} profile={profile} onDone={() => setStudentConsent({ consent_at: new Date().toISOString() })} onSignOut={() => sb.auth.signOut()} />;
 return (
 <>
 <DeliveryPortal sb={sb} profile={profile} onSignOut={() => sb.auth.signOut()} />
@@ -133,6 +139,7 @@ return (
 {tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canWrite={canWrite} onNavigate={setTab} only={superAdmin ? null : (canWrite || isReviewer || canSets || isAnalyst ? ["teacher"] : ["staff"])} />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} onApplied={reloadIdentity} />}
 {tab === "students" && isCenterStaff && <CenterStudents sb={sb} notify={notify} />}
+{tab === "announce" && isCenterStaff && <CenterAnnouncements sb={sb} notify={notify} />}
 {tab === "dashboard" && canFullBank && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
 {tab === "meq" && canFullBank && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
