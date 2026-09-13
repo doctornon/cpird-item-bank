@@ -13,6 +13,7 @@ import ItemCompensation from "./ItemCompensation";
 import Schedule from "./Schedule";
 import Import from "./Import";
 import RolesAdmin from "./RolesAdmin";
+import AccountsAdmin from "./AccountsAdmin";
 import DeliveryPortal from "./DeliveryPortal";
 import DeliveryManager from "./DeliveryManager";
 export default function Page() {
@@ -93,6 +94,7 @@ return (
 {tab === "comp" && canApprove && <ItemCompensation sb={sb} notify={notify} />}
 {tab === "schedule" && <Schedule sb={sb} canWrite={canApprove} notify={notify} />}
 {tab === "import" && canWrite && <Import sb={sb} bp={bp} me={me} notify={notify} />}
+{tab === "accounts" && superAdmin && <AccountsAdmin sb={sb} me={me} notify={notify} />}
 {tab === "roles" && superAdmin && <RolesAdmin sb={sb} me={me} notify={notify} />}
 </div>
 </StaffShell>
@@ -117,6 +119,7 @@ function Login({ sb }) {
 const go = () => sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
 return (
 <div className="login"><div className="box">
+<img src="/cpird-logo.png" alt="CPIRD" style={{ height: 96, width: "auto", display: "block", margin: "0 auto 14px" }} onError={(e) => { e.currentTarget.style.display = "none"; }} />
 <h2 style={{ color: "var(--accent)", marginBottom: 6 }}>คลังข้อสอบ CPIRD</h2>
 <p className="muted" style={{ marginBottom: 22 }}>ระบบจัดการคลังข้อสอบ MCQ/MEQ · เข้าสู่ระบบด้วยบัญชีเดียวกับ LMS</p>
 <button className="gbtn" onClick={go}>เข้าสู่ระบบด้วย Google</button>

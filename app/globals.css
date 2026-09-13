@@ -306,6 +306,8 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 .staff-shell{--staff-header-height:68px;min-height:100vh;min-height:100dvh}
 .staff-header{height:var(--staff-header-height);display:flex;align-items:center;gap:16px;padding:0 24px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
 .staff-header .brand{white-space:nowrap}.staff-header .who{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand-logo{height:34px;width:auto;flex:none;object-fit:contain}
+@media(max-width:480px){.brand-logo{height:28px}}
 .staff-menu{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:10px;flex:none}.staff-take{white-space:nowrap}
 .staff-body{position:relative;display:grid;grid-template-columns:208px minmax(0,1fr);min-height:calc(100vh - var(--staff-header-height));min-height:calc(100dvh - var(--staff-header-height));align-items:start}
 .staff-nav{padding:20px 12px;border-right:1px solid var(--line);background:var(--surface);position:sticky;top:var(--staff-header-height);height:calc(100dvh - var(--staff-header-height));overflow-y:auto;overscroll-behavior:contain}

@@ -20,13 +20,13 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,c
   ['คลังข้อสอบ', [['bank','คลัง MCQ'],['meq','คลัง MEQ'],...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(canApprove?[['theater','วิพากษ์ข้อสอบ']]:[])]],
   ['การสอบ', canApprove?[['sets','สร้างชุดข้อสอบ']]:[]],
   ['ระบบทดสอบ', [...(canApprove?[['assign','จัดรอบสอบ & ตั้งค่า'],['scores','ดูคะแนนสอบ']]:[]),['take','ทำข้อสอบ']]],
-  ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(canApprove?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['roles','จัดการสิทธิ์']]:[])]]
+  ['จัดการ', [...(canWrite?[['import','นำเข้า Excel']]:[]),...(canApprove?[['comp','ค่าตอบแทนข้อสอบ']]:[]),...(superAdmin?[['accounts','จัดการบัญชีผู้ใช้'],['roles','จัดการสิทธิ์']]:[])]]
  ];
  const navigate=key=>{onNavigate(key);setExpanded(false);};
  return <div className={'staff-shell'+(collapsed?' nav-collapsed':'')}>
   <header className="staff-header">
    <button ref={menu} className="btn ghost sm staff-menu" aria-label={compact?'เมนูหลัก':collapsed?'แสดงเมนูหลัก':'ย่อเมนูหลัก'} aria-expanded={compact?expanded:!collapsed} aria-controls="staff-navigation" onClick={()=>compact?setExpanded(!expanded):setCollapsed(!collapsed)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
-   <span className="brand">คลังข้อสอบ CPIRD</span><span className="grow"/>
+   <img src="/cpird-logo.png" alt="" className="brand-logo" onError={e=>{e.currentTarget.style.display='none';}}/><span className="brand">คลังข้อสอบ CPIRD</span><span className="grow"/>
    {onLock&&<button type="button" className="lock-toggle" role="switch" aria-checked={false} title="ล็อกหน้าจอเพื่อความปลอดภัย" onClick={onLock}><span className="lock-toggle-track"><span className="lock-toggle-thumb"/></span><span className="lock-toggle-label">🔓 ล็อกหน้าจอ</span></button>}
    <span className="who">{profile?.full_name||profile?.email}<br/><span className="muted">{superAdmin?'ผู้ดูแลระบบ':roles.join(', ')}</span></span>
    <button className="btn ghost sm staff-signout" onClick={onSignOut}>ออก</button>
