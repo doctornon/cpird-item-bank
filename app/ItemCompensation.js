@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 const baht = (n) => (n || 0).toLocaleString("th-TH", { maximumFractionDigits: 2 });
+const TH_M = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+const fmtTH = (s) => { if (!s) return "—"; const [y, m, d] = String(s).split("-").map(Number); return `${d} ${TH_M[m - 1]} ${y + 543}`; };
 
 export default function ItemCompensation({ sb, notify }) {
   const [items, setItems] = useState([]);      // {id, author_id, status, use_count}
@@ -10,12 +12,15 @@ export default function ItemCompensation({ sb, notify }) {
   const [names, setNames] = useState({});
   const [basis, setBasis] = useState("selected"); // 'selected' | 'used'
   const [rate, setRate] = useState("");
+  const [cutoff, setCutoff] = useState("2026-10-01"); // count only items created on/after this date (1 ต.ค. 2569)
+  useEffect(() => { try { const c = localStorage.getItem("cpird_comp_cutoff"); if (c) setCutoff(c); } catch {} }, []);
+  const setCutoffPersist = (v) => { setCutoff(v); try { localStorage.setItem("cpird_comp_cutoff", v); } catch {} };
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const [{ data: bi, error: e1 }, { data: es }] = await Promise.all([
-      sb.from("bank_items").select("id,author_id,status,use_count,type").neq("status", "personal").eq("is_sample", false).limit(5000),
+      sb.from("bank_items").select("id,author_id,status,use_count,type,created_at").neq("status", "personal").eq("is_sample", false).limit(5000),
       sb.from("exam_sets").select("id,name,kind").eq("kind", "mcq").order("id"),
     ]);
     if (e1) { setLoading(false); notify("โหลดข้อมูลไม่สำเร็จ: " + e1.message); return; }
@@ -36,10 +41,11 @@ export default function ItemCompensation({ sb, notify }) {
     sb.from("exam_set_items").select("item_id").eq("exam_set_id", setId).then(({ data }) => setSetItemIds(new Set((data || []).map((r) => String(r.item_id)))));
   }, [sb, setId]);
 
+  const scoped = useMemo(() => cutoff ? items.filter((it) => (it.created_at || "") >= cutoff) : items, [items, cutoff]);
   const rows = useMemo(() => {
     const inSet = (it) => !setItemIds || setItemIds.has(String(it.id));
     const by = {};
-    for (const it of items) {
+    for (const it of scoped) {
       const a = it.author_id || "—";
       const r = by[a] || (by[a] = { author: a, submitted: 0, selected: 0, used: 0 });
       r.submitted++; // total authored (non-personal), bank-wide
@@ -55,7 +61,7 @@ export default function ItemCompensation({ sb, notify }) {
       const base = basis === "used" ? r.used : r.selected;
       return { ...r, name: names[r.author] || (r.author === "—" ? "(ไม่ระบุผู้ออก)" : r.author.slice(0, 8)), base, pay: base * rt };
     }).sort((a, b) => b.base - a.base || b.submitted - a.submitted);
-  }, [items, setItemIds, names, basis, rate]);
+  }, [scoped, setItemIds, names, basis, rate]);
 
   const totals = useMemo(() => rows.reduce((a, r) => ({ submitted: a.submitted + r.submitted, selected: a.selected + r.selected, used: a.used + r.used, base: a.base + r.base, pay: a.pay + r.pay }), { submitted: 0, selected: 0, used: 0, base: 0, pay: 0 }), [rows]);
 
@@ -72,7 +78,10 @@ export default function ItemCompensation({ sb, notify }) {
           <select id="ic-set" value={setId} onChange={(e) => setSetId(e.target.value)}><option value="">ทุกชุด (ภาพรวมทั้งคลัง)</option>{sets.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
         <div className="search-field"><label htmlFor="ic-rate">อัตราค่าตอบแทน (บาท/ข้อ)</label>
           <input id="ic-rate" type="number" min="0" step="1" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="เช่น 200" /></div>
+        <div className="search-field"><label htmlFor="ic-cut">นับข้อสอบที่ออกตั้งแต่วันที่</label>
+          <input id="ic-cut" type="date" value={cutoff} onChange={(e) => setCutoffPersist(e.target.value)} /></div>
       </div>
+      <p className="set-note" style={{ marginTop: 6 }}>เริ่มคิดค่าตอบแทนจากข้อสอบที่สร้างตั้งแต่ <b>{fmtTH(cutoff)}</b> เป็นต้นไป · ข้อสอบที่ออกก่อนหน้านี้ถือว่าจ่ายค่าตอบแทนไปแล้ว ไม่นำมาคิดซ้ำ · นับได้ {scoped.length} ข้อในเกณฑ์นี้{cutoff && scoped.length === 0 ? " (ยังไม่มีข้อสอบใหม่หลังวันที่กำหนด)" : ""}</p>
       <div className="bank-status" role="tablist" style={{ marginTop: 8 }}>
         <span className="mk" style={{ margin: "0 8px 0 0", alignSelf: "center" }}>ฐานคำนวณค่าตอบแทน:</span>
         {[["selected", "ตามข้อที่คัดเลือก"], ["used", "ตามข้อที่ใช้จริง"]].map(([v, l]) =>
