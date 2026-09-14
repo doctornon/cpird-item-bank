@@ -517,3 +517,7 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 .meq-open-toggle.on{background:var(--good-tint);color:var(--good)}
 .meq-open-toggle:disabled{opacity:.6;cursor:default}
 @media(max-width:640px){.meq-open-toggle{flex-basis:116px;padding:10px 8px}}
+
+/* MCQ bank: status badge stacked above เปิด/แก้ไข in the merged column */
+.item-actions{align-items:stretch}
+.item-actions>.pill{align-self:center;margin-bottom:4px}

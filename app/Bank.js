@@ -135,12 +135,11 @@ return <div key={key} className="bank-drop">
 <th aria-sort={aria("spec")}><button type="button" className="th-sort" onClick={() => toggleSort("spec")}>สาขา{arrow("spec")}</button></th>
 <th aria-sort={aria("icd")}><button type="button" className="th-sort" onClick={() => toggleSort("icd")}>ICD{arrow("icd")}</button></th>
 <th aria-sort={aria("author")}><button type="button" className="th-sort" onClick={() => toggleSort("author")}>ผู้ออก{arrow("author")}</button></th>
-<th aria-sort={aria("status")}><button type="button" className="th-sort" onClick={() => toggleSort("status")}>สถานะ{arrow("status")}</button></th>
-<th><span className="sr-only">การดำเนินการ</span></th>
+<th aria-sort={aria("status")}><button type="button" className="th-sort" onClick={() => toggleSort("status")}>สถานะ / จัดการ{arrow("status")}</button></th>
 </tr></thead>
 <tbody>
-{loading && <tr><td colSpan={10}><div className="empty">กำลังโหลด…</div></td></tr>}
-{!loading && sorted.length === 0 && <tr><td colSpan={10}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
+{loading && <tr><td colSpan={9}><div className="empty">กำลังโหลด…</div></td></tr>}
+{!loading && sorted.length === 0 && <tr><td colSpan={9}><div className="empty"><h3>{items.length ? "ไม่พบข้อสอบที่ตรงกับการค้นหา" : "ยังไม่มีข้อสอบในคลัง"}</h3><p>{items.length ? "ลองเปลี่ยนคำค้นหาหรือล้างตัวกรอง" : canWrite ? "เริ่มต้นด้วยปุ่มสร้างข้อสอบด้านบน" : "ข้อสอบจะแสดงที่นี่เมื่อมีการเพิ่มเข้าคลัง"}</p></div></td></tr>}
 {!loading && sorted.map(it => <tr key={it.id}>
 <td className="item-idcell">#{it.id}</td>
 <td><div className="item-meta"><span className={"pill " + it.type}>{it.type.toUpperCase()}</span>{it.is_sample && <span className="pill draft" title="ข้อสอบตัวอย่างที่ ศรว. เผยแพร่ — ใช้จัดสอบจริงไม่ได้">🧪 ตัวอย่าง ศรว.</span>}<span>{it.exam_year ? `ปี ${it.exam_year}` : ""}</span></div><button className="item-title" disabled={previewOnly} onClick={() => setPreviewing(it)}>{(stems[it.current_version_id] || "ยังไม่มีข้อความโจทย์").slice(0, 160)}</button><div className="item-detail">{it.use_count > 0 ? `ใช้สอบแล้ว ${it.use_count} ครั้ง` : "ยังไม่เคยใช้สอบ"}</div></td>
@@ -149,7 +148,7 @@ return <div key={key} className="bank-drop">
 <td>{taskName(it.physician_task) || "—"}</td>
 <td>{specName(it.specialty_id) || "—"}</td>
 <td title={ICD_TH[it.icd_system] || ""}>{it.icd_system ? ICD_ROMAN[it.icd_system] : "—"}</td>
-<td>{authors[it.author_id] || "—"}</td><td><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span></td><td><div className="item-actions"><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button>{canWrite && <button className="btn ghost sm" disabled={previewOnly} aria-label={"แก้ไขข้อสอบ " + it.id} onClick={() => setEditing(it)}>แก้ไข</button>}</div></td>
+<td>{authors[it.author_id] || "—"}</td><td><div className="item-actions"><span className={"pill " + it.status}>{STATUS_TH[it.status]}</span><button className="btn ghost sm" disabled={previewOnly} title={previewOnly ? "ตัวอย่างนี้แสดงเฉพาะรายการและตัวกรอง" : undefined} aria-label={"เปิดข้อสอบ " + it.id} onClick={() => setPreviewing(it)}>เปิด</button>{canWrite && <button className="btn ghost sm" disabled={previewOnly} aria-label={"แก้ไขข้อสอบ " + it.id} onClick={() => setEditing(it)}>แก้ไข</button>}</div></td>
 </tr>)}
 </tbody></table></div>}
 {previewing && <ItemPreview sb={sb} bp={bp} item={previewing} authorName={authors[previewing.author_id]}
