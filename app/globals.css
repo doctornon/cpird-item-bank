@@ -483,3 +483,16 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 .notif-title{font-size:13px;font-weight:600;color:var(--ink)}
 .notif-msg{font-size:12.5px;color:var(--ink-soft);margin-top:2px;line-height:1.5;white-space:pre-wrap}
 .notif-time{font-size:11px;color:var(--ink-faint);margin-top:3px}
+
+/* MEQ practice: two selectable answer layouts + comfortable reading/typing */
+.delivery-paper.meq-work.meq-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+.delivery-paper.meq-work.meq-split .meq-scenario{position:sticky;top:12px;max-height:calc(100vh - 170px);overflow:auto;padding-right:6px}
+.delivery-paper.meq-work.meq-stack{display:block}
+.meq-scenario .delivery-text{white-space:pre-wrap;font-size:16px;line-height:1.85}
+.delivery-active .delivery-stem{white-space:pre-wrap}
+.meq-answer-field{display:flex;flex-direction:column;gap:8px;font-weight:600;margin-top:10px}
+.meq-answer-field textarea{width:100%;font-family:inherit;font-weight:400;font-size:17px;line-height:1.9;padding:14px 16px;min-height:200px;border:1px solid var(--line);border-radius:10px;resize:vertical}
+.meq-answer-field textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+.meq-read .meq-read-stage{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.meq-read .meq-read-q{margin:10px 0 10px 4px}
+@media(max-width:820px){.delivery-paper.meq-work.meq-split{grid-template-columns:1fr}.delivery-paper.meq-work.meq-split .meq-scenario{position:static;max-height:none}}
