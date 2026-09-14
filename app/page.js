@@ -110,7 +110,7 @@ return (
 {tab === "home" && <HomeCards profile={profile} roles={[]} superAdmin={false} canWrite={false} onNavigate={setTab} only={["teacher"]} />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} onApplied={reloadIdentity} />}
 {tab === "schedule" && <Schedule sb={sb} canWrite={false} notify={notify} />}
-{tab === "take" && <><div className="preview-banner" style={{ background: "var(--accent-tint)", color: "var(--ink)" }}>🧪 โหมดตัวอย่าง — ทดลองการทำข้อสอบก่อนได้รับการแต่งตั้ง</div><DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("home")} /></>}
+{tab === "take" && <><div className="preview-banner" style={{ background: "var(--accent-tint)", color: "var(--ink)" }}>🧪 โหมดตัวอย่าง — ทดลองการทำข้อสอบก่อนได้รับการแต่งตั้ง</div><DeliveryPortal sb={sb} profile={profile} embedded /></>}
 {!allowed.includes(tab) && <div className="card"><p className="muted" style={{ margin: 0 }}>🔒 เมนูนี้จะเปิดใช้งานเมื่อได้รับการแต่งตั้งเป็นผู้ออกข้อสอบ</p></div>}
 </div>
 </StaffShell>
@@ -132,12 +132,12 @@ return (
 </>
 );
 }
-if (tab === "take") return <DeliveryPortal sb={sb} profile={profile} onExit={() => setTab("dashboard")} />;
 return (
 <>
 <StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} isCenterStaff={isCenterStaff} showApply={showApply} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} headerExtra={canWrite ? <Notifications sb={sb} onOpen={() => setTab("mybank")} /> : null} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canWrite={canWrite} onNavigate={setTab} only={superAdmin ? null : (canWrite || isReviewer || canSets || isAnalyst ? ["teacher"] : ["staff"])} />}
+{tab === "take" && <DeliveryPortal sb={sb} profile={profile} embedded />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} onApplied={reloadIdentity} />}
 {tab === "students" && isCenterStaff && <CenterStudents sb={sb} notify={notify} />}
 {tab === "announce" && isCenterStaff && <CenterAnnouncements sb={sb} notify={notify} />}
