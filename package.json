@@ -5,7 +5,12 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --test",
+    "test:unit": "node --test",
+    "test:db": "bash tests/run-db.sh",
+    "test:e2e": "playwright test -c e2e/playwright.config.mjs",
+    "test:all": "npm run test:unit && npm run test:db && npm run test:e2e"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.45.4",
@@ -13,5 +18,8 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "xlsx": "0.18.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.47.2"
   }
 }
