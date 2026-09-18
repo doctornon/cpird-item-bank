@@ -3,6 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {BLOOM} from '../lib/constants';
 import {newBlueprint,coverage} from '../lib/blueprint.mjs';
 import {SPEC_VERSIONS,TOS,scaledTargets,ICD_SYSTEMS} from '../lib/tos.mjs';
+import {proposeSet} from '../lib/sampler.mjs';
 import Heat,{domainLabel} from './Heat';
 import ItemPreview from './ItemPreview';
 import ItemEditor from './ItemEditor';
@@ -26,6 +27,7 @@ export default function ExamSets({sb,bp,me,notify}){
  const [editItem,setEditItem]=useState(null);
  const [magicPick,setMagicPick]=useState(null);
  const [magicOpen,setMagicOpen]=useState(null),[magicDetail,setMagicDetail]=useState({});
+ const [autoPlan,setAutoPlan]=useState(null);
  const run=async(fn)=>{if(lock.current)return;lock.current=true;setBusy(true);setError('');try{await fn();}catch(e){setError(e.message);}finally{lock.current=false;setBusy(false);}};
  const query=async(p)=>{const r=await p;if(r.error)throw Error(r.error.message);return r.data||[];};
  const loadSets=useCallback(async()=>{const {data,error}=await sb.from('exam_sets').select('*').order('id',{ascending:true});if(error)throw Error(error.message);setSets(data||[]);},[sb]);
@@ -39,12 +41,12 @@ export default function ExamSets({sb,bp,me,notify}){
   let available;
   if(s.kind==='meq')available=await query(sb.from('meq_cases').select('id,title,document,academic_year').order('updated_at',{ascending:false}));
   else {
-   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level,icd_system,nl_group,use_count,is_sample,created_at').eq('type','mcq').neq('status','personal').order('updated_at',{ascending:false}));
+   available=await query(sb.from('bank_items').select('id,current_version_id,status,specialty_id,nl_domain_code,physician_task,bloom_level,icd_system,nl_group,use_count,last_used_at,author_id,is_sample,created_at').eq('type','mcq').neq('status','personal').order('updated_at',{ascending:false}));
    const ids=available.map(x=>x.current_version_id).filter(Boolean);
    const versions=ids.length?await query(sb.from('bank_item_versions').select('id,stem').in('id',ids)):[];
    const stems=new Map(versions.map(v=>[v.id,v.stem]));available=available.map(x=>({...x,title:stems.get(x.current_version_id)||'ยังไม่มีโจทย์'}));
    const aids=available.map(x=>x.id);
-   const st=aids.length?await query(sb.from('bank_item_stats').select('item_id,p_value,discrimination,n,computed_at').in('item_id',aids).order('computed_at',{ascending:false})):[];
+   const st=aids.length?await query(sb.from('bank_item_stats').select('item_id,p_value,discrimination,point_biserial,n,distractors,computed_at').in('item_id',aids).order('computed_at',{ascending:false})):[];
    const qm={};st.forEach(s=>{if(!qm[s.item_id])qm[s.item_id]=s;});setQmap(qm);
   }
   setPool(available);setItems(chosen.map(x=>({...x,detail:available.find(p=>String(p.id)===String(x.item_id||x.case_id))||{title:'ไม่พบข้อสอบหรือไม่มีสิทธิ์อ่าน'}})));
@@ -118,6 +120,36 @@ export default function ExamSets({sb,bp,me,notify}){
  const toggleMagicView=(id)=>run(async()=>{if(magicOpen===id){setMagicOpen(null);return;}setMagicOpen(id);if(!magicDetail[id]){const it=await fullItem(id);let ver=null,opts=[];if(it.current_version_id){const vr=await query(sb.from('bank_item_versions').select('*').eq('id',it.current_version_id).limit(1));ver=vr[0]||null;opts=await query(sb.from('bank_item_options').select('*').eq('version_id',it.current_version_id).order('order_index'));}setMagicDetail(m=>({...m,[id]:{ver,options:opts}}));}});
  const toggleMagic=(id)=>setMagicPick(m=>{const s=new Set(m.sel);s.has(id)?s.delete(id):s.add(id);return{...m,sel:s};});
  const confirmMagic=()=>mutate(async()=>{const chosen=magicPick.cands.filter(p=>magicPick.sel.has(p.id));setMagicPick(null);if(!chosen.length)return;const base=items.length?Math.max(...items.map(x=>x.position)):0;await query(sb.from('exam_set_items').insert(chosen.map((p,i)=>({exam_set_id:sel.id,item_id:p.id,position:base+i+1,points:1}))));notify('เพิ่ม '+chosen.length+' ข้อเข้าชุดแล้ว');});
+
+ // ── จัดชุดทั้งชุดตามเกณฑ์ ศรว. ในครั้งเดียว ───────────────────────────────
+ // ต่างจาก magic เดิมที่เติมทีละช่อง ตรงที่มองทุกช่องพร้อมกัน จึงไม่ให้ช่องง่ายแย่งข้อของช่องหายากไป
+ // ช่องที่ยังขาดหลังเสนอแล้ว แปลว่าคลังไม่มีข้อที่ตรงเงื่อนไขจริง ต้องออกข้อใหม่
+ const autoTargets=()=>{
+  if(!spec)return[];
+  const inSet=(pred)=>items.filter(x=>x.detail&&pred(x.detail)).length;
+  const cells=[
+   {key:'cat1',label:'หมวด1 ทั่วไป',pred:i=>!i.icd_system&&i.nl_domain_code!=='X',target:spec.category1.target},
+   {key:'group1',label:'กลุ่มฉุกเฉิน (group 1)',pred:i=>i.nl_group===1,target:spec.group1.target},
+   ...spec.systems.filter(s=>s.g2>0).map(s=>({key:s.code+'-g2',label:'กลุ่ม 2 · '+s.roman+' '+s.th,pred:i=>i.icd_system===s.code&&i.nl_group===2,target:s.g2})),
+   ...spec.systems.filter(s=>s.g3>0).map(s=>({key:s.code+'-g3',label:'กลุ่ม 3 · '+s.roman+' '+s.th,pred:i=>i.icd_system===s.code&&i.nl_group===3,target:s.g3})),
+  ];
+  return cells.map(c=>({...c,need:Math.max(0,c.target-inSet(c.pred))})).filter(c=>c.need>0);
+ };
+ const buildAuto=(seed)=>{
+  const targets=autoTargets();
+  if(!targets.length){notify('ชุดนี้ครบตามเกณฑ์แล้ว ไม่มีช่องที่ต้องเติม');return;}
+  const plan=proposeSet({pool,stats:qmap,targets,chosen:items.map(x=>x.item_id),seed,now:Date.now()});
+  setAutoPlan({...plan,seed,sel:new Set(plan.picks.map(p=>p.id))});
+ };
+ const toggleAuto=(id)=>setAutoPlan(a=>{const s=new Set(a.sel);s.has(id)?s.delete(id):s.add(id);return{...a,sel:s};});
+ const confirmAuto=()=>mutate(async()=>{
+  const chosen=autoPlan.picks.filter(p=>autoPlan.sel.has(p.id));setAutoPlan(null);
+  if(!chosen.length)return;
+  const base=items.length?Math.max(...items.map(x=>x.position)):0;
+  await query(sb.from('exam_set_items').insert(chosen.map((p,i)=>({exam_set_id:sel.id,item_id:p.id,position:base+i+1,points:1}))));
+  notify('จัดชุดอัตโนมัติ เพิ่ม '+chosen.length+' ข้อเข้าชุดแล้ว');
+ });
+ const poolTitle=(id)=>{const p=pool.find(x=>String(x.id)===String(id));return p?(p.title||'').slice(0,120):'#'+id;};
  const props2569=spec&&sel.spec_version==='2569'?TOS['2569'].taskProps:null;
  const taskGap=props2569?[['dx','วินิจฉัย'],['labs','ตรวจทางห้องปฏิบัติการ'],['tx','รักษา'],['patho','พยาธิกำเนิด'],['prognosis','พยากรณ์โรค']].map(([code,label])=>{
   const target=Math.round(spec.group1.target*props2569.group1[code]+spec.diseaseTotal*props2569.group23[code]);
@@ -158,7 +190,11 @@ export default function ExamSets({sb,bp,me,notify}){
  </tbody></table></div>
  <div className="set-actions"><button className="btn" disabled={busy} onClick={saveDetail}>บันทึกตาราง{dirty?' *':''}</button></div>
  <p className="set-note">* การจัด ICD/กลุ่ม 1-2-3 ของข้อเดิมเป็นแบบอัตโนมัติ ควรให้กรรมการรีวิว · การแยกกลุ่มควรอิงรายชื่อโรคทางการของ ศรว.</p>
- <div className="mk" style={{margin:'18px 0 6px'}}>② สรุปความครบถ้วนเทียบเกณฑ์ (ขาด / เกิน)</div>
+ <div className="row" style={{margin:'18px 0 6px',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+  <div className="mk" style={{margin:0}}>② สรุปความครบถ้วนเทียบเกณฑ์ (ขาด / เกิน)</div>
+  <button className="btn" style={{marginLeft:'auto'}} disabled={busy} onClick={()=>buildAuto(String(Date.now()))}>✨ จัดชุดทั้งชุดตามเกณฑ์</button>
+ </div>
+ <p className="set-note">การจัดทั้งชุดจะมองทุกช่องพร้อมกัน ช่องที่มีข้อให้เลือกน้อยจะได้สิทธิ์เลือกก่อน เลี่ยงข้อที่เพิ่งใช้สอบหรือใช้ซ้ำบ่อย และไม่ให้ผู้แต่งคนเดียวครองชุด</p>
  <div className="tablewrap"><table><thead><tr><th>ภาพรวม</th><th>เป้าหมาย</th><th>มีในชุด</th><th>ขาด / เกิน</th><th>เติมอัตโนมัติ (magic)</th></tr></thead><tbody>
  {(()=>{const d=setCat1-spec.category1.target;const avail=pool.filter(p=>p.status==='approved'&&!p.icd_system&&p.nl_domain_code!=='X'&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr><td>หมวด1 ทั่วไป (ส่งเสริม/จริยธรรม/นิติเวช)</td><td>{spec.category1.target}</td><td>{setCat1}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>openMagic(p=>!p.icd_system&&p.nl_domain_code!=='X',-d,'หมวด1 ทั่วไป')}>✨ เลือกเติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})()}
  {(()=>{const d=setG1-spec.group1.target;const avail=pool.filter(p=>p.status==='approved'&&p.nl_group===1&&!items.some(x=>String(x.item_id)===String(p.id))).length;return <tr><td>กลุ่มฉุกเฉิน (group 1)</td><td>{spec.group1.target}</td><td>{setG1}</td><td className={d<0?'gap-short':d>0?'gap-over':'gap-ok'}>{d===0?'ครบ':d<0?('ขาด '+(-d)):('เกิน '+d)}</td><td>{d<0?(avail>0?<button className="btn ghost sm" disabled={busy} onClick={()=>openMagic(p=>p.nl_group===1,-d,'กลุ่มฉุกเฉิน (group 1)')}>✨ เลือกเติม {Math.min(-d,avail)} ข้อ</button>:<span className="gap-short">ไม่มีในคลัง — ออกใหม่</span>):null}</td></tr>;})()}
@@ -187,7 +223,33 @@ export default function ExamSets({sb,bp,me,notify}){
  </>}</section></div>
  {viewItem&&<ItemPreview sb={sb} bp={bp} item={viewItem} canWrite canApprove notify={notify} onChanged={()=>run(()=>load(sel))} onEdit={()=>{const it=viewItem;setViewItem(null);setEditItem(it);}} onClose={()=>setViewItem(null)}/>}
  {editItem&&<ItemEditor sb={sb} bp={bp} item={editItem} canApprove notify={notify} onClose={()=>setEditItem(null)} onSaved={()=>{setEditItem(null);run(()=>load(sel));loadSets();}}/>}
- {magicPick&&<div className="overlay" onClick={e=>e.target===e.currentTarget&&setMagicPick(null)}><div className="modal"><div className="row" style={{justifyContent:'space-between',alignItems:'center',marginBottom:10}}><h3>เลือกข้อที่จะเติม — {magicPick.label} (แนะนำ {magicPick.need})</h3><button className="btn ghost sm" onClick={()=>setMagicPick(null)}>ปิด</button></div>{!magicPick.cands.length?<p className="empty">ไม่มีข้อในคลังที่ตรงเงื่อนไข — แนะนำให้ออกข้อใหม่</p>:<><p className="set-note">ติ๊กเลือกข้อที่ต้องการ (ระบบติ๊กข้อแนะนำให้แล้ว {magicPick.need} ข้อ — ปรับได้) · “คุณภาพ” มาจากสถิติการสอบจริง (ความยาก p · อำนาจจำแนก r · จำนวนผู้ตอบ n) · กด “ดู” เพื่อกางโจทย์ด้านล่าง · แก้ไขข้อเดิมไม่ได้ ให้ “ออกคู่ขนาน” แทน</p><div className="tablewrap" style={{maxHeight:'60vh',overflowY:'auto'}}><table><thead><tr><th/><th>โจทย์ / ปีที่ออก · ภารกิจ</th><th>คุณภาพ (จากคะแนน)</th><th/></tr></thead><tbody>{magicPick.cands.map(p=>{const q=quality(p);const on=magicPick.sel.has(p.id);const yr=beYear(p.created_at);const dt=magicDetail[p.id];return [<tr key={p.id} className={'magic-row'+(on?' checked':'')} onClick={()=>toggleMagic(p.id)}><td><input type="checkbox" className="magic-check" checked={on} onChange={()=>toggleMagic(p.id)} onClick={e=>e.stopPropagation()}/></td><td>{(p.title||'').slice(0,140)}<div className="muted" style={{fontSize:11}}>{yr?('ออกปี '+yr):'ปีไม่ระบุ'}{p.physician_task?(' · '+(TASK_SHORT[p.physician_task]||p.physician_task)):''}{p.icd_system?(' · '+(ICD_SYSTEMS.find(s=>s.code===p.icd_system)?.roman||'')):''} · {usedNote(p)}</div></td><td className={q.cls}>{q.label}<div className="muted" style={{fontSize:11}}>{q.detail}</div></td><td><div className="row" style={{gap:4}}><button className="btn ghost sm" disabled={busy} onClick={e=>{e.stopPropagation();toggleMagicView(p.id);}}>{magicOpen===p.id?'ซ่อน':'ดู'}</button><button className="btn ghost sm" disabled={busy} title="สร้างข้อคู่ขนาน" onClick={e=>{e.stopPropagation();parallel(p.id);}}>ออกคู่ขนาน</button></div></td></tr>,
+ {autoPlan&&<div className="overlay" onClick={e=>e.target===e.currentTarget&&setAutoPlan(null)}><div className="modal">
+ <div className="row" style={{justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+  <h3>ชุดที่ระบบเสนอ — เลือกแล้ว {autoPlan.sel.size} จาก {autoPlan.need} ข้อที่ยังขาด</h3>
+  <button className="btn ghost sm" onClick={()=>setAutoPlan(null)}>ปิด</button>
+ </div>
+ {autoPlan.gaps.length>0&&<div className="delivery-alert" role="alert" style={{marginBottom:10}}>
+  คลังไม่มีข้อพอในบางช่อง ต้องออกข้อใหม่ — {autoPlan.gaps.map(g=>g.label+' ขาด '+g.short).join(' · ')}
+ </div>}
+ {!autoPlan.picks.length?<p className="empty">ไม่มีข้อในคลังที่ใช้เติมช่องที่ขาดได้เลย</p>:<>
+  <div className="tablewrap" style={{maxHeight:'58vh',overflowY:'auto'}}><table><thead><tr><th/><th>ช่องในตารางสเปก</th><th>โจทย์</th><th>เหตุผลที่เลือก</th></tr></thead><tbody>
+   {autoPlan.picks.map(p=>{const on=autoPlan.sel.has(p.id);return <tr key={p.id} className={'magic-row'+(on?' checked':'')} onClick={()=>toggleAuto(p.id)}>
+    <td><input type="checkbox" className="magic-check" checked={on} onChange={()=>toggleAuto(p.id)} onClick={e=>e.stopPropagation()}/></td>
+    <td style={{whiteSpace:'nowrap'}}>{p.cellLabel}</td>
+    <td>{poolTitle(p.id)}</td>
+    <td className={p.tested?'gap-ok':''}>{p.reason}</td>
+   </tr>;})}
+  </tbody></table></div>
+  <div className="row" style={{justifyContent:'space-between',gap:8,marginTop:10,flexWrap:'wrap'}}>
+   <button className="btn ghost" disabled={busy} onClick={()=>buildAuto(String(Date.now()))}>↻ สุ่มชุดใหม่</button>
+   <div className="row" style={{gap:8}}>
+    <button className="btn ghost" onClick={()=>setAutoPlan(null)}>ยกเลิก</button>
+    <button className="btn" disabled={busy||autoPlan.sel.size===0} onClick={confirmAuto}>เพิ่ม {autoPlan.sel.size} ข้อเข้าชุด</button>
+   </div>
+  </div>
+ </>}
+</div></div>}
+{magicPick&&<div className="overlay" onClick={e=>e.target===e.currentTarget&&setMagicPick(null)}><div className="modal"><div className="row" style={{justifyContent:'space-between',alignItems:'center',marginBottom:10}}><h3>เลือกข้อที่จะเติม — {magicPick.label} (แนะนำ {magicPick.need})</h3><button className="btn ghost sm" onClick={()=>setMagicPick(null)}>ปิด</button></div>{!magicPick.cands.length?<p className="empty">ไม่มีข้อในคลังที่ตรงเงื่อนไข — แนะนำให้ออกข้อใหม่</p>:<><p className="set-note">ติ๊กเลือกข้อที่ต้องการ (ระบบติ๊กข้อแนะนำให้แล้ว {magicPick.need} ข้อ — ปรับได้) · “คุณภาพ” มาจากสถิติการสอบจริง (ความยาก p · อำนาจจำแนก r · จำนวนผู้ตอบ n) · กด “ดู” เพื่อกางโจทย์ด้านล่าง · แก้ไขข้อเดิมไม่ได้ ให้ “ออกคู่ขนาน” แทน</p><div className="tablewrap" style={{maxHeight:'60vh',overflowY:'auto'}}><table><thead><tr><th/><th>โจทย์ / ปีที่ออก · ภารกิจ</th><th>คุณภาพ (จากคะแนน)</th><th/></tr></thead><tbody>{magicPick.cands.map(p=>{const q=quality(p);const on=magicPick.sel.has(p.id);const yr=beYear(p.created_at);const dt=magicDetail[p.id];return [<tr key={p.id} className={'magic-row'+(on?' checked':'')} onClick={()=>toggleMagic(p.id)}><td><input type="checkbox" className="magic-check" checked={on} onChange={()=>toggleMagic(p.id)} onClick={e=>e.stopPropagation()}/></td><td>{(p.title||'').slice(0,140)}<div className="muted" style={{fontSize:11}}>{yr?('ออกปี '+yr):'ปีไม่ระบุ'}{p.physician_task?(' · '+(TASK_SHORT[p.physician_task]||p.physician_task)):''}{p.icd_system?(' · '+(ICD_SYSTEMS.find(s=>s.code===p.icd_system)?.roman||'')):''} · {usedNote(p)}</div></td><td className={q.cls}>{q.label}<div className="muted" style={{fontSize:11}}>{q.detail}</div></td><td><div className="row" style={{gap:4}}><button className="btn ghost sm" disabled={busy} onClick={e=>{e.stopPropagation();toggleMagicView(p.id);}}>{magicOpen===p.id?'ซ่อน':'ดู'}</button><button className="btn ghost sm" disabled={busy} title="สร้างข้อคู่ขนาน" onClick={e=>{e.stopPropagation();parallel(p.id);}}>ออกคู่ขนาน</button></div></td></tr>,
  magicOpen===p.id&&<tr key={p.id+'-d'} className="magic-detail"><td colSpan={4} style={{background:'var(--surface-2)'}}>{!dt?<p className="muted" style={{margin:0}}>กำลังโหลดโจทย์…</p>:<div><div className="pv-stem" style={{whiteSpace:'pre-wrap',marginBottom:8}}>{dt.ver?.stem||'—'}</div>{(dt.options||[]).map(o=><div key={o.id} className={'pv-opt'+(o.is_correct?' correct':'')} style={{marginBottom:4}}><b>{o.label}.</b> {o.body}{o.is_correct&&<span className="pv-badge">เฉลย</span>}</div>)}{(dt.ver?.explanation||dt.ver?.rationale)&&<div className="muted" style={{marginTop:8,whiteSpace:'pre-wrap'}}>{dt.ver.explanation||dt.ver.rationale}</div>}</div>}</td></tr>];})}</tbody></table></div><div className="row" style={{justifyContent:'flex-end',gap:8,marginTop:10}}><button className="btn ghost" onClick={()=>setMagicPick(null)}>ยกเลิก</button><button className="btn" disabled={busy||magicPick.sel.size===0} onClick={confirmMagic}>เพิ่ม {magicPick.sel.size} ข้อที่เลือก</button></div></>}</div></div>}
  </div>;
 }
