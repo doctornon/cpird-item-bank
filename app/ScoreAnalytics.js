@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ItemAnalysis from "./ItemAnalysis";
 const num = (v) => (v == null || v === "" ? null : Number(v));
 const pct = (v) => (v == null ? "—" : Number(v).toFixed(1) + "%");
 const fdate = (iso) => (iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "—");
@@ -19,13 +20,17 @@ function agg(rows) {
   return { n: rows.length, students, avg, passed, passRate: rows.length ? (100 * passed) / rows.length : null };
 }
 
-export default function ScoreAnalytics({ sb, bp, notify, initialTab }) {
+export default function ScoreAnalytics({ sb, bp, notify, initialTab, canFlag = false }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState(initialTab || "sets"); // sets | centers | people
   const [sel, setSel] = useState({}); // {set, center, student, assignment, attempt}
   const [answers, setAnswers] = useState(null);
   const [itemAnalysis, setItemAnalysis] = useState(null);
+  // สถิติเชิงลึกจาก bank_item_stats (ค่าอำนาจจำแนก สหสัมพันธ์ ตัวลวง) แยกจาก facility ที่โหลดเร็ว
+  const [deepStats, setDeepStats] = useState(null);
+  const [computing, setComputing] = useState(false);
+  const [openItem, setOpenItem] = useState(null);
   const [q, setQ] = useState("");
   const [ansFilter, setAnsFilter] = useState("all"); // all | correct | incorrect | bookmarked | selected
   const [selIds, setSelIds] = useState(() => new Set());
@@ -93,11 +98,37 @@ export default function ScoreAnalytics({ sb, bp, notify, initialTab }) {
     if (error) return notify("โหลดคำตอบไม่สำเร็จ: " + error.message);
     setAnswers(data || []);
   };
+  const loadDeepStats = useCallback(async (assignmentId) => {
+    const { data, error } = await sb.rpc("exam_item_stats", { _assignment_id: assignmentId });
+    if (error) { setDeepStats({ items: [], summary: null }); return; }
+    setDeepStats(data || { items: [], summary: null });
+  }, [sb]);
+
   const openAssignment = async (a) => {
-    setSel((s) => ({ ...s, assignment: a, attempt: null })); setItemAnalysis(null); setAnswers(null);
+    setSel((s) => ({ ...s, assignment: a, attempt: null }));
+    setItemAnalysis(null); setAnswers(null); setDeepStats(null); setOpenItem(null);
     const { data, error } = await sb.rpc("exam_item_analysis", { _assignment_id: a.id });
     if (error) return notify("โหลดวิเคราะห์รายข้อไม่สำเร็จ: " + error.message);
     setItemAnalysis(data || []);
+    await loadDeepStats(a.id);
+  };
+
+  // การคำนวณอยู่ฝั่งฐานข้อมูล กดเมื่อผลสอบครบแล้ว หรือกดซ้ำได้หลังตรวจเพิ่ม
+  const computeStats = async (assignmentId) => {
+    setComputing(true);
+    const { data, error } = await sb.rpc("exam_compute_item_stats", { _assignment_id: assignmentId });
+    setComputing(false);
+    if (error) return notify("คำนวณสถิติไม่สำเร็จ: " + error.message);
+    await loadDeepStats(assignmentId);
+    notify(`คำนวณแล้ว ${data?.written ?? 0} ข้อ จากผู้สอบ ${data?.attempts ?? 0} คน`);
+  };
+
+  // ส่งข้อกลับเข้าคิวทบทวน เพื่อไม่ให้ถูกหยิบไปใช้ในชุดถัดไปก่อนแก้
+  const sendToReview = async (itemId) => {
+    const { error } = await sb.from("bank_items").update({ status: "review", updated_at: new Date().toISOString() }).eq("id", itemId);
+    if (error) return notify("ส่งกลับไปทบทวนไม่สำเร็จ: " + error.message);
+    setDeepStats((s) => (s ? { ...s, items: s.items.map((it) => (it.item_id === itemId ? { ...it, status: "review" } : it)) } : s));
+    notify(`ส่งข้อ #${itemId} กลับไปทบทวนแล้ว`);
   };
 
   const overall = useMemo(() => agg(rows), [rows]);
@@ -178,16 +209,16 @@ export default function ScoreAnalytics({ sb, bp, notify, initialTab }) {
       <div>
         <button className="btn ghost sm" onClick={() => { setSel((s) => ({ ...s, assignment: null })); setItemAnalysis(null); }}>‹ กลับ {sel.set ? "ชุด " + sel.set.name : ""}</button>
         <div className="workspace-heading"><div><h2>{sel.assignment.title}</h2><p>{sel.set?.name} · เปิดสอบ {fdate(sel.assignment.open_at)} · ผู้เข้าสอบ {sel.assignment.n} ครั้ง · เฉลี่ย {pct(sel.assignment.avg)} · ผ่าน {pct(sel.assignment.passRate)}</p></div></div>
-        <h3 className="delivery-subheading">วิเคราะห์รายข้อ (ค่าความยาก/สัดส่วนตอบถูก)</h3>
-        {itemAnalysis == null ? <p className="muted">กำลังโหลด…</p> : (
-          <div className="tablewrap"><table><thead><tr><th>#ข้อ</th><th>โจทย์</th><th>ตอบ</th><th>ถูก</th><th>ตอบถูก %</th></tr></thead>
-            <tbody>{itemAnalysis.length === 0 ? <tr><td colSpan={5}><div className="empty">ไม่มีข้อมูล</div></td></tr> :
-              itemAnalysis.map((it) => { const f = num(it.facility); const cls = f == null ? "" : f < 30 ? "retired" : f > 85 ? "review" : "approved";
-                return <tr key={it.item_id}><td>#{it.item_id}</td><td style={{ maxWidth: 420 }}>{(it.stem || "").slice(0, 140)}</td><td>{it.n_answered}</td><td>{it.n_correct}</td>
-                  <td><span className={"pill " + cls}>{f == null ? "—" : f + "%"}</span></td></tr>; })}
-            </tbody></table></div>
-        )}
-        <p className="muted" style={{ marginTop: 6 }}>สีแดง = ยากมาก (&lt;30%) · เหลือง = ง่ายมาก (&gt;85%) · เขียว = พอเหมาะ</p>
+        <ItemAnalysis
+          facility={itemAnalysis}
+          deep={deepStats}
+          computing={computing}
+          canFlag={canFlag}
+          openItem={openItem}
+          onToggle={(id) => setOpenItem((cur) => (cur === id ? null : id))}
+          onCompute={() => computeStats(sel.assignment.id)}
+          onReview={sendToReview}
+        />
         <h3 className="delivery-subheading" style={{ marginTop: 16 }}>ผู้เข้าสอบในรอบนี้ ({assignmentAttempts.length})</h3>
         <div className="tablewrap"><table><thead><tr><th>ผู้สอบ</th><th>รหัส</th><th>ศูนย์</th><th>คะแนน</th><th>%</th><th>ผล</th><th></th></tr></thead>
           <tbody>{assignmentAttempts.map((r) => <tr key={r.attempt_id}><td>{r.student_name || "—"}</td><td>{r.student_code || "—"}</td><td>{r.center_name || "—"}</td>
