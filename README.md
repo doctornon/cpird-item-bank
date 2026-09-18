@@ -47,6 +47,14 @@ The set builder already had a per-cell magic fill, but it ranked candidates with
 
 The app is a single client route that switches panels with one `tab` state, but every panel was imported statically, so opening the sign-in screen downloaded the whole staff application. Panels now load through `next/dynamic` when their tab is first opened, and `xlsx` — used only to build the import template and read an uploaded workbook — is imported inside the two handlers that need it. First Load JS for `/` went from 348 kB to 133 kB; `xlsx` sits in its own 408 kB chunk that only import users ever fetch. The single-route structure and the remembered-tab behaviour are unchanged.
 
+## Exam countdown and preparation guidance
+
+Students see a live countdown to their upcoming rounds at the top of the exam portal, above the list of rounds open to them. Dates live in `lib/examSchedule.mjs` rather than being derived from `exam_delivery.exams`, because delivery rounds are created close to the exam while candidates need the date months ahead. Every time carries an explicit +07:00 offset, so the countdown is correct on a device set to another timezone, and dates are rendered in Thai with the Buddhist year.
+
+A round is filtered by the student's `profiles.year_level` (Y4/Y5/Y6/Cert); rounds with no year listed, and students with no year recorded, fall through to showing everything rather than nothing. A round stays on screen for twelve hours after it starts so the card does not vanish mid-exam. The ticking digits are hidden from screen readers and a minute-resolution summary is announced instead, so the countdown is not read out once a second.
+
+The preparation-guidance module links out to the CPIRD Wise portal. Until a URL is set in `PREP_PORTAL.url` the card shows a 'being prepared' state instead of a button that goes nowhere. `tests/countdown.test.mjs` covers the arithmetic, the past/at-the-moment boundaries, filtering by year, and the Thai formatting.
+
 ## Content restriction
 
 Only application code and database structure may be published. Importing old examinations requires a further explicit instruction from the user. No seed data is included. Local reference files and the design preview are excluded from both Git and Vercel uploads.

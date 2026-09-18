@@ -60,7 +60,7 @@ if (!session) return;
 (async () => {
 const uid = session.user.id;
 const [{ data: prof }, { data: rr }, { data: sa }] = await Promise.all([
-sb.from("profiles").select("full_name,email,role,student_id").eq("id", uid).maybeSingle(),
+sb.from("profiles").select("full_name,email,role,student_id,year_level").eq("id", uid).maybeSingle(),
 sb.from("exam_item_roles").select("role").eq("user_id", uid),
 sb.rpc("auth_is_super_admin"),
 ]);
