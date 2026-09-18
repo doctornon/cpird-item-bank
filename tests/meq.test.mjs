@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { summarizeMeq, reviewMeq, validateMeq } from '../lib/meq.mjs';
+import { summarizeMeq, reviewMeq, validateMeq, badImages, newCase } from '../lib/meq.mjs';
 
 const doc = { stages: [
   { minutes: 5, questions: [{ points: 2 }] },
@@ -33,4 +33,32 @@ test('validateMeq rejects the common bad inputs', () => {
 test('validateMeq passes a complete case (empty string = ok)', () => {
   const ok = { title: 'เคสทดสอบ', academic_year: 2568, exam_year: 2569, document: { stages: [ { scenario: 'ผู้ป่วย...', minutes: 5, questions: [{ prompt: 'ถาม?', points: 2 }] } ] } };
   assert.equal(validateMeq(ok), '');
+});
+
+test("รูปภาพที่ไม่ใช่ https ถูกปฏิเสธก่อนบันทึก", () => {
+  const c = newCase();
+  c.title = "เคสทดสอบ";
+  c.document.stages[0].scenario = "ผู้ป่วยชาย 60 ปี";
+  c.document.stages[0].questions[0].prompt = "วินิจฉัยเบื้องต้น";
+  c.document.stages[0].questions[0].points = 2;
+  c.document.stages[0].images = [{ url: "javascript:alert(1)" }];
+  assert.match(validateMeq(c), /https/);
+});
+
+test("รูปภาพที่ถูกต้องผ่านการตรวจ และรูปว่างก็ผ่าน", () => {
+  const c = newCase();
+  c.title = "เคสทดสอบ";
+  c.document.stages[0].scenario = "ผู้ป่วยชาย 60 ปี";
+  c.document.stages[0].questions[0].prompt = "วินิจฉัยเบื้องต้น";
+  c.document.stages[0].questions[0].points = 2;
+  assert.equal(validateMeq(c), "");
+  c.document.stages[0].images = [{ url: "https://example.supabase.co/x.png", width: 60, align: "center" }];
+  assert.equal(validateMeq(c), "");
+});
+
+test("ความกว้างและตำแหน่งรูปที่ผิดช่วงถูกปฏิเสธ", () => {
+  assert.match(badImages([{ url: "https://a/b.png", width: 400 }]), /ความกว้าง/);
+  assert.match(badImages([{ url: "https://a/b.png", align: "top" }]), /ตำแหน่ง/);
+  assert.match(badImages("not-an-array"), /รูปแบบ/);
+  assert.equal(badImages(null), "");
 });
