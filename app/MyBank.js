@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import * as XLSX from "xlsx";
+// xlsx เป็นไลบรารีก้อนใหญ่และใช้เฉพาะตอนดาวน์โหลด template หรืออ่านไฟล์ที่อัปโหลด
+// จึงโหลดแบบ dynamic ไม่ให้ติดไปกับ bundle แรกของทุกคนที่เปิดแอป
+const loadXlsx = () => import("xlsx");
 import { OPT_LABELS } from "../lib/constants";
 import ItemEditor from "./ItemEditor";
 import ItemPreview from "./ItemPreview";
@@ -68,7 +70,8 @@ export default function MyBank({ sb, bp, me, canWrite, notify }) {
   };
 
   // ---- Excel template download ----
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await loadXlsx();
     const wb = XLSX.utils.book_new();
     const mcqExample = ["ผู้ป่วยชาย 60 ปี มีอาการเจ็บหน้าอก… (โจทย์ตัวอย่าง — ลบออกก่อนอัปโหลด)", (bp.domains[0]?.title || "I"), "", (bp.tasks[0]?.name || "การวินิจฉัย"), (bp.specs[0]?.name_th || "อายุรศาสตร์"), "", "", "ตัวเลือก A", "ตัวเลือก B", "ตัวเลือก C", "ตัวเลือก D", "ตัวเลือก E", "A", "เฉลยอธิบายว่าทำไม A ถูก", "tag1, tag2"];
     const meqExample = ["สถานการณ์ผู้ป่วย… (โจทย์ตัวอย่าง — ลบออกก่อนอัปโหลด)", (bp.domains[0]?.title || "I"), "", (bp.tasks[0]?.name || "การวินิจฉัย"), (bp.specs[0]?.name_th || "อายุรศาสตร์"), "", "", "แนวคำตอบ/เฉลย", "10", "เกณฑ์การให้คะแนน (rubric)", "tag1"];
@@ -87,7 +90,7 @@ export default function MyBank({ sb, bp, me, canWrite, notify }) {
     XLSX.writeFile(wb, "template_คลังข้อสอบของฉัน.xlsx");
   };
 
-  const parseSheet = (ws, type) => {
+  const parseSheet = (XLSX, ws, type) => {
     const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
     return json.filter((r) => pick(r, "stem")).map((r) => {
       const dRaw = pick(r, "nl_domain"), tRaw = pick(r, "physician_task"), spRaw = pick(r, "specialty");
@@ -114,10 +117,11 @@ export default function MyBank({ sb, bp, me, canWrite, notify }) {
     setResult(null); setProgress(0); setFileName(file.name);
     try {
       const buf = await file.arrayBuffer();
+      const XLSX = await loadXlsx();
       const wb = XLSX.read(buf, { type: "array" });
       let all = [];
-      if (wb.Sheets["MCQ"]) all = all.concat(parseSheet(wb.Sheets["MCQ"], "mcq"));
-      if (wb.Sheets["MEQ"]) all = all.concat(parseSheet(wb.Sheets["MEQ"], "meq"));
+      if (wb.Sheets["MCQ"]) all = all.concat(parseSheet(XLSX, wb.Sheets["MCQ"], "mcq"));
+      if (wb.Sheets["MEQ"]) all = all.concat(parseSheet(XLSX, wb.Sheets["MEQ"], "meq"));
       if (!all.length) notify("ไม่พบข้อมูลในชีท MCQ/MEQ (ตรวจ template)");
       setRows(all);
     } catch (err) { notify("อ่านไฟล์ไม่สำเร็จ: " + (err.message || err)); }

@@ -3,26 +3,30 @@ import { useEffect, useState, useCallback } from "react";
 import { getSupabase } from "../lib/supabaseClient";
 import StaffShell from "./StaffShell";
 import Dashboard from "./Dashboard";
-import Bank from "./Bank";
-import MyBank from "./MyBank";
-import MeqBank from "./MeqBank";
-import Theater from "./Theater";
-import ExamSets from "./ExamSets";
-import ScoreAnalytics from "./ScoreAnalytics";
-import ItemCompensation from "./ItemCompensation";
-import Schedule from "./Schedule";
-import Import from "./Import";
-import RolesAdmin from "./RolesAdmin";
-import AccountsAdmin from "./AccountsAdmin";
-import Certificates from "./Certificates";
 import HomeCards from "./HomeCards";
-import WriterApplication from "./WriterApplication";
-import CenterStudents from "./CenterStudents";
-import CenterAnnouncements from "./CenterAnnouncements";
-import StudentConsent from "./StudentConsent";
-import Notifications from "./Notifications";
-import DeliveryPortal from "./DeliveryPortal";
-import DeliveryManager from "./DeliveryManager";
+import dynamic from "next/dynamic";
+// แต่ละแท็บเปิดทีละหน้าจอ การโหลดทุกแผงตั้งแต่เปิดแอปทำให้ bundle แรกใหญ่โดยไม่จำเป็น
+// จึงโหลดเมื่อผู้ใช้เข้าแท็บนั้นจริง ๆ ทุกแผงเป็น client component จึงปิด ssr
+const panel = (load) => dynamic(load, { ssr: false, loading: () => <div className="card"><p className="muted" style={{ margin: 0 }}>กำลังโหลด…</p></div> });
+const Bank = panel(() => import("./Bank"));
+const MyBank = panel(() => import("./MyBank"));
+const MeqBank = panel(() => import("./MeqBank"));
+const Theater = panel(() => import("./Theater"));
+const ExamSets = panel(() => import("./ExamSets"));
+const ScoreAnalytics = panel(() => import("./ScoreAnalytics"));
+const ItemCompensation = panel(() => import("./ItemCompensation"));
+const Schedule = panel(() => import("./Schedule"));
+const Import = panel(() => import("./Import"));
+const RolesAdmin = panel(() => import("./RolesAdmin"));
+const AccountsAdmin = panel(() => import("./AccountsAdmin"));
+const Certificates = panel(() => import("./Certificates"));
+const WriterApplication = panel(() => import("./WriterApplication"));
+const CenterStudents = panel(() => import("./CenterStudents"));
+const CenterAnnouncements = panel(() => import("./CenterAnnouncements"));
+const StudentConsent = panel(() => import("./StudentConsent"));
+const Notifications = panel(() => import("./Notifications"));
+const DeliveryPortal = panel(() => import("./DeliveryPortal"));
+const DeliveryManager = panel(() => import("./DeliveryManager"));
 export default function Page() {
 const sb = getSupabase();
 const [session, setSession] = useState(undefined);
@@ -148,8 +152,8 @@ return (
 {canSets && <div hidden={tab !== "sets"}><ExamSets sb={sb} bp={bp} me={me} notify={notify} /></div>}
 {tab === "assign" && superAdmin && <DeliveryManager sb={sb} />}
 {tab === "theater" && isReviewer && <Theater sb={sb} bp={bp} me={me} notify={notify} />}
-{tab === "scores" && isAnalyst && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="people" />}
-{tab === "analyze" && isAnalyst && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="sets" />}
+{tab === "scores" && isAnalyst && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="people" canFlag={isReviewer} />}
+{tab === "analyze" && isAnalyst && <ScoreAnalytics sb={sb} bp={bp} notify={notify} initialTab="sets" canFlag={isReviewer} />}
 {tab === "cert" && isAnalyst && <Certificates sb={sb} notify={notify} />}
 {tab === "comp" && superAdmin && <ItemCompensation sb={sb} notify={notify} />}
 {tab === "schedule" && <Schedule sb={sb} canWrite={superAdmin} notify={notify} />}
