@@ -25,13 +25,21 @@ All delivery migrations in `supabase/migrations/` have been applied in filename 
 
 **Schema drift warning.** The live database is ahead of this directory. Verified on 2026-09-18: `exam_delivery.manage` and `exam_delivery.run` in production carry question images (`stem_images`, option `image_url`/`image_width`), `pool_draw`, sample-item guards and `feedback_at` gating that no migration here records. Five further migrations (`20260912192833`…`20260912194326`) were applied from another working copy and never committed. Replaying this directory onto production would revert those fixes. Capture the real baseline with `supabase link --project-ref dainlpcqtirqoekrjtem && supabase db pull` before writing any migration that replaces an existing function; until then, add only additive migrations. Rollback-only checks in `tests/delivery.sql` and `tests/delivery-expiry.sql` cover admission, ownership, answer secrecy, stale revision rejection, submission, grading, and deadlines. They use temporary synthetic fixtures and existing auth identities; run against a staging database where possible.
 
-Limits: no public guest links, certificate/email delivery, or proctoring. MCQ questions and options do render images; structured MEQ stages do not yet. Resume does not pause the timer. Expiry is finalized on the next student/examiner request; there is no background scheduler. Unsynced answers cannot be accepted after a deadline. No concurrent-user load test has been performed.
+Limits: no public guest links, certificate/email delivery, or proctoring. Images render for MCQ stems and options and for MEQ stages and questions. Resume does not pause the timer. Expiry is finalized on the next student/examiner request; there is no background scheduler. Unsynced answers cannot be accepted after a deadline. No concurrent-user load test has been performed.
 
 The old `Assign.js` and `ExamPortal.js` are retained as legacy source but are not mounted by the new UI. Existing legacy assignments/attempts were verified empty before switching the entry points.
 
 ## Question images
 
 MCQ stems and options may carry images, uploaded from the item editor into the `question-images` Supabase Storage bucket and rendered in preview, theater and live delivery. Migration `20260918000000_question_images_hardening.sql` closed a finding where `qimg_insert`/`qimg_update`/`qimg_delete` were permissive for every authenticated user with no ownership or role predicate, which let any signed-in account — students included, since the auth base is shared — overwrite or delete any question image. Writes now require `committee`/`item_writer` or super admin, edits and deletes are restricted to the uploader, and the bucket is capped at 5 MB and JPEG/PNG/WebP. The bucket held no objects when this was applied. `tests/question-images.sql` fails if the open policies or the missing limits ever return.
+
+## MEQ images
+
+Stages and questions carry an `images` array, edited through the shared `ImageField` and uploaded to the same `question-images` bucket; uploads are checked client-side against the limits the bucket enforces, and `validateMeq` rejects anything that is not an https URL along with out-of-range widths and unknown alignments — images stay structured data, never markup.
+
+`exam_delivery.manage` copies stages wholesale, so images reached the frozen paper on their own, but `exam_delivery.run` rebuilt a whitelist object and dropped them before the paper reached the student. Because the live definition of `run` is far ahead of the copy in this directory, migration `20260918020000_meq_stage_images.sql` reads the real definition with `pg_get_functiondef` and replaces only the two fragments that need changing — each verified to occur exactly once — leaving every other byte intact and aborting if they are not found.
+
+Applied 2026-09-19 and verified through the real `delivery_run('start')` path: a stage image and a per-question image both reach the student, model answers and rubrics still do not, and MCQ image handling is untouched. The function grew by exactly the 88 characters of the two insertions, so nothing else was rewritten.
 
 ## Item analysis
 
