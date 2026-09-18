@@ -4,6 +4,7 @@ import {
   timeLeft, upcomingExams, examsForStudent, thaiDateTime,
   countdownLabel, urgency, KEEP_AFTER_START, yearNumber,
 } from "../lib/countdown.mjs";
+import { EXAM_SCHEDULE, PREP_PORTAL } from "../lib/examSchedule.mjs";
 
 const MEQ = "2026-12-12T12:00:00+07:00";
 const at = (iso) => new Date(iso).getTime();
@@ -97,4 +98,24 @@ test("the stored year level maps to a number, and non-year students see everythi
   assert.deepEqual(examsForStudent(schedule, "Y5", now).map((e) => e.key), ["meq", "mcq"]);
   assert.deepEqual(examsForStudent(schedule, "Y6", now).map((e) => e.key), ["meq"]);
   assert.deepEqual(examsForStudent(schedule, "Cert", now).map((e) => e.key), ["meq", "mcq"]);
+});
+
+// ป้องกันการสลับรอบโดยไม่ตั้งใจ — ชั้นปีกับรอบเช้า/บ่ายต้องตรงกับที่ประกาศ
+test("the real schedule sends year 4 to the morning session and year 5 to the afternoon", () => {
+  const now = at("2026-11-01T00:00:00+07:00");
+  const y4 = examsForStudent(EXAM_SCHEDULE, "Y4", now).map((e) => e.key);
+  const y5 = examsForStudent(EXAM_SCHEDULE, "Y5", now).map((e) => e.key);
+  assert.deepEqual(y4, ["meq-2569", "prenle-mcq-2570-am"]);
+  assert.deepEqual(y5, ["meq-2569", "prenle-mcq-2570-pm"]);
+});
+
+test("the published exam dates keep the weekday they were announced with", () => {
+  const byKey = Object.fromEntries(EXAM_SCHEDULE.map((e) => [e.key, e]));
+  assert.equal(thaiDateTime(byKey["meq-2569"].at), "วันเสาร์ที่ 12 ธันวาคม 2569 เวลา 12.00 น.");
+  assert.equal(thaiDateTime(byKey["prenle-mcq-2570-am"].at), "วันเสาร์ที่ 13 กุมภาพันธ์ 2570 เวลา 09.00 น.");
+  assert.equal(thaiDateTime(byKey["prenle-mcq-2570-pm"].at), "วันเสาร์ที่ 13 กุมภาพันธ์ 2570 เวลา 13.00 น.");
+});
+
+test("the preparation portal link is an https URL so the card renders a button", () => {
+  assert.match(PREP_PORTAL.url, /^https:\/\//);
 });
