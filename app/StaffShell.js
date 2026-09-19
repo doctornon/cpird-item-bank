@@ -7,7 +7,7 @@ const PREVIEW_GROUPS=[
  ['ระบบทดสอบ',[['sets','สร้างชุดข้อสอบ'],['assign','จัดรอบการสอบและตั้งค่า']]],
  ['ห้องสอบของฉัน',[['take','ทำข้อสอบ (ตัวอย่าง)'],['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]],
 ];
-export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,isReviewer,isAnalyst,isCenterStaff,showApply,canWrite,canSets,canFullBank,preview,headerExtra,onLock,onSignOut,children}) {
+export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,isReviewer,isAnalyst,isCenterStaff,isCenterAdmin,showApply,canWrite,canSets,canFullBank,preview,headerExtra,onLock,onSignOut,children}) {
  const [expanded,setExpanded]=useState(false);
  const [collapsed,setCollapsed]=useState(false);
  const [compact,setCompact]=useState(false);
@@ -24,7 +24,7 @@ export default function StaffShell({tab,onNavigate,profile,roles=[],superAdmin,i
  },[expanded]);
  const groups=preview?PREVIEW_GROUPS:[
   ['ภาพรวม', [['home','หน้าแรก'],...(canFullBank?[['dashboard','แดชบอร์ด']]:[]),['schedule','กำหนดการ & ประกาศ ศรว.'],...(showApply?[['apply','สมัครเป็นผู้ออกข้อสอบ']]:[])]],
-  ['ศูนย์แพทย์ของฉัน', [...(isCenterStaff?[['students','บัญชีนักศึกษาของศูนย์'],['announce','ประกาศสนามสอบ']]:[])]],
+  ['ศูนย์แพทย์ของฉัน', [...(isCenterStaff?[['students','บัญชีนักศึกษาของศูนย์']]:[]),...((isCenterStaff||isCenterAdmin)?[['announce','ประกาศสนามสอบ']]:[])]],
   ['คลังข้อสอบ', [...(canFullBank?[['bank','คลัง MCQ'],['meq','คลัง MEQ']]:[]),...(canWrite?[['mybank','คลังข้อสอบของฉัน']]:[]),...(isReviewer?[['theater','วิพากษ์ข้อสอบ']]:[])]],
   ['ระบบทดสอบ', [...(canSets?[['sets','สร้างชุดข้อสอบ']]:[]),...(superAdmin?[['assign','จัดรอบการสอบและตั้งค่า']]:[])]],
   ['ห้องสอบของฉัน', [['take','ทำข้อสอบ'],...(isAnalyst?[['scores','ดูคะแนนสอบ'],['analyze','วิเคราะห์ผลสอบ'],['cert','ประกาศนียบัตร']]:[])]],

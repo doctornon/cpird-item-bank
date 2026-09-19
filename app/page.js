@@ -60,7 +60,7 @@ if (!session) return;
 (async () => {
 const uid = session.user.id;
 const [{ data: prof }, { data: rr }, { data: sa }] = await Promise.all([
-sb.from("profiles").select("full_name,email,role,student_id,year_level").eq("id", uid).maybeSingle(),
+sb.from("profiles").select("full_name,email,role,student_id,year_level,is_center_admin").eq("id", uid).maybeSingle(),
 sb.from("exam_item_roles").select("role").eq("user_id", uid),
 sb.rpc("auth_is_super_admin"),
 ]);
@@ -90,11 +90,13 @@ const isReviewer = superAdmin || roles.includes("committee") || roles.includes("
 const canSets = superAdmin || roles.includes("committee") || roles.includes("set_manager");      // กรรมการจัดทำชุด
 const isAnalyst = superAdmin || roles.includes("committee") || roles.includes("analyst");        // กรรมการวิเคราะห์ผล
 const isCenterStaff = superAdmin || roles.includes("center_staff");                              // นักวิชาการ/เจ้าหน้าที่ศูนย์
+const isCenterAdmin = !!profile?.is_center_admin;                                                // อาจารย์แพทย์ admin ประจำศูนย์
 const showApply = !(superAdmin || canWrite || isReviewer || canSets || isAnalyst || isCenterStaff);
 // จัดรอบการสอบ + ค่าตอบแทน = เจ้าหน้าที่ สพพ. (admin) เท่านั้น
 // who may browse the SHARED item bank (matches the bank_items RLS read policy) — pure item_writer excluded
 const canFullBank = superAdmin || roles.includes("committee") || roles.includes("reviewer") || roles.includes("set_manager") || roles.includes("analyst") || roles.includes("registrar");
-const hasStaff = superAdmin || roles.length > 0;
+// อาจารย์แพทย์ admin ประจำศูนย์นับเป็นฝั่งเจ้าหน้าที่ด้วย ไม่งั้นจะตกไปหน้าผู้สอบและเข้าประกาศสนามสอบไม่ได้
+const hasStaff = superAdmin || roles.length > 0 || isCenterAdmin;
 if (session === undefined) return <div className="login"><div className="muted">กำลังโหลด…</div></div>;
 if (!session) return <Login sb={sb} />;
 const bp = { domains, subitems, tasks, specs };
@@ -138,13 +140,13 @@ return (
 }
 return (
 <>
-<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} isCenterStaff={isCenterStaff} showApply={showApply} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} headerExtra={canWrite ? <Notifications sb={sb} onOpen={() => setTab("mybank")} /> : null} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
+<StaffShell tab={tab} onNavigate={setTab} profile={profile} roles={roles} superAdmin={superAdmin} isReviewer={isReviewer} isAnalyst={isAnalyst} isCenterStaff={isCenterStaff} isCenterAdmin={isCenterAdmin} showApply={showApply} canWrite={canWrite} canSets={canSets} canFullBank={canFullBank} headerExtra={canWrite ? <Notifications sb={sb} onOpen={() => setTab("mybank")} /> : null} onLock={superAdmin ? () => setLockedPersist(true) : null} onSignOut={() => sb.auth.signOut()}>
 <div className="section">
 {tab === "home" && <HomeCards profile={profile} roles={roles} superAdmin={superAdmin} canWrite={canWrite} onNavigate={setTab} only={superAdmin ? null : (canWrite || isReviewer || canSets || isAnalyst ? ["teacher"] : ["staff"])} />}
 {tab === "take" && <DeliveryPortal sb={sb} profile={profile} embedded />}
 {tab === "apply" && <WriterApplication sb={sb} profile={profile} notify={notify} onApplied={reloadIdentity} />}
 {tab === "students" && isCenterStaff && <CenterStudents sb={sb} notify={notify} />}
-{tab === "announce" && isCenterStaff && <CenterAnnouncements sb={sb} notify={notify} />}
+{tab === "announce" && (isCenterStaff || isCenterAdmin) && <CenterAnnouncements sb={sb} notify={notify} />}
 {tab === "dashboard" && canFullBank && <Dashboard sb={sb} bp={bp} notify={notify} onOpenBank={(status) => { setBankStatus(status); setTab("bank"); }} />}
 {tab === "bank" && canFullBank && <Bank initialStatus={bankStatus} sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}
 {tab === "meq" && canFullBank && <MeqBank sb={sb} bp={bp} me={me} canWrite={canWrite} canApprove={isReviewer} notify={notify} />}

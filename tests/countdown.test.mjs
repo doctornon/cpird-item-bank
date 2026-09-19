@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import {
   timeLeft, upcomingExams, examsForStudent, thaiDateTime,
   countdownLabel, urgency, KEEP_AFTER_START, yearNumber,
+  fromRow, registrationState, deadlineLabel, DEADLINE_WARN_DAYS,
 } from "../lib/countdown.mjs";
-import { EXAM_SCHEDULE, PREP_PORTAL } from "../lib/examSchedule.mjs";
+import { PREP_PORTAL } from "../lib/examSchedule.mjs";
 
 const MEQ = "2026-12-12T12:00:00+07:00";
 const at = (iso) => new Date(iso).getTime();
@@ -100,22 +101,77 @@ test("the stored year level maps to a number, and non-year students see everythi
   assert.deepEqual(examsForStudent(schedule, "Cert", now).map((e) => e.key), ["meq", "mcq"]);
 });
 
-// ป้องกันการสลับรอบโดยไม่ตั้งใจ — ชั้นปีกับรอบเช้า/บ่ายต้องตรงกับที่ประกาศ
-test("the real schedule sends year 4 to the morning session and year 5 to the afternoon", () => {
-  const now = at("2026-11-01T00:00:00+07:00");
-  const y4 = examsForStudent(EXAM_SCHEDULE, "Y4", now).map((e) => e.key);
-  const y5 = examsForStudent(EXAM_SCHEDULE, "Y5", now).map((e) => e.key);
-  assert.deepEqual(y4, ["meq-2569", "prenle-mcq-2570-am"]);
-  assert.deepEqual(y5, ["meq-2569", "prenle-mcq-2570-pm"]);
-});
-
-test("the published exam dates keep the weekday they were announced with", () => {
-  const byKey = Object.fromEntries(EXAM_SCHEDULE.map((e) => [e.key, e]));
-  assert.equal(thaiDateTime(byKey["meq-2569"].at), "วันเสาร์ที่ 12 ธันวาคม 2569 เวลา 12.00 น.");
-  assert.equal(thaiDateTime(byKey["prenle-mcq-2570-am"].at), "วันเสาร์ที่ 13 กุมภาพันธ์ 2570 เวลา 09.00 น.");
-  assert.equal(thaiDateTime(byKey["prenle-mcq-2570-pm"].at), "วันเสาร์ที่ 13 กุมภาพันธ์ 2570 เวลา 13.00 น.");
-});
-
 test("the preparation portal link is an https URL so the card renders a button", () => {
   assert.match(PREP_PORTAL.url, /^https:\/\//);
+});
+
+// ── การรับสมัครและเดดไลน์ ────────────────────────────────────────────────
+const row = {
+  exam_key: "meq-2569", kind: "MEQ", title: "สอบ MEQ",
+  starts_at: MEQ, years: [4], where_text: "ศูนย์แพทย์",
+  register_closes_at: "2026-12-07T12:00:00+07:00",
+};
+
+test("a schedule row from the database becomes the shape the cards render", () => {
+  const e = fromRow(row);
+  assert.equal(e.key, "meq-2569");
+  assert.equal(e.at, MEQ);
+  assert.equal(e.closesAt, row.register_closes_at);
+  assert.deepEqual(e.years, [4]);
+  assert.equal(e.where, "ศูนย์แพทย์");
+});
+
+test("years defaults to an empty list when the column is null", () => {
+  assert.deepEqual(fromRow({ ...row, years: null }).years, []);
+});
+
+test("registration is open before the deadline and shut after it", () => {
+  const e = fromRow(row);
+  const before = registrationState(e, at("2026-12-01T00:00:00+07:00"), false);
+  assert.equal(before.closed, false);
+  assert.equal(before.canRegister, true);
+  assert.equal(before.canCancel, false);
+
+  const after = registrationState(e, at("2026-12-07T12:00:01+07:00"), false);
+  assert.equal(after.closed, true);
+  assert.equal(after.canRegister, false);
+});
+
+test("someone already registered is offered cancel, not register", () => {
+  const e = fromRow(row);
+  const s = registrationState(e, at("2026-12-01T00:00:00+07:00"), true);
+  assert.equal(s.canRegister, false);
+  assert.equal(s.canCancel, true);
+  assert.equal(s.warn, false, "คนที่สมัครแล้วไม่ต้องถูกเร่ง");
+});
+
+test("cancelling is no longer offered once the deadline passes", () => {
+  const s = registrationState(fromRow(row), at("2026-12-08T00:00:00+07:00"), true);
+  assert.equal(s.canCancel, false);
+  assert.equal(s.closed, true);
+});
+
+test("the deadline warning appears only in the last week, and only if not signed up", () => {
+  const e = fromRow(row);
+  const far = registrationState(e, at("2026-11-20T12:00:00+07:00"), false);
+  assert.equal(far.warn, false);
+  const near = registrationState(e, at("2026-12-05T12:00:00+07:00"), false);
+  assert.equal(near.warn, true);
+  assert.ok(near.left.days < DEADLINE_WARN_DAYS);
+});
+
+test("a round with no deadline recorded still allows registering", () => {
+  const s = registrationState(fromRow({ ...row, register_closes_at: null }), at("2026-12-01T00:00:00+07:00"), false);
+  assert.equal(s.closed, false);
+  assert.equal(s.canRegister, true);
+});
+
+test("the deadline reads in days, then hours, then minutes, then as closed", () => {
+  const e = fromRow(row);
+  const say = (iso, reg = false) => deadlineLabel(registrationState(e, at(iso), reg));
+  assert.equal(say("2026-12-04T12:00:00+07:00"), "ปิดรับสมัครในอีก 3 วัน");
+  assert.equal(say("2026-12-07T09:30:00+07:00"), "ปิดรับสมัครในอีก 2 ชั่วโมง");
+  assert.equal(say("2026-12-07T11:45:00+07:00"), "ปิดรับสมัครในอีก 15 นาที");
+  assert.equal(say("2026-12-08T00:00:00+07:00"), "ปิดรับสมัครแล้ว");
+  assert.equal(say("2026-12-08T00:00:00+07:00", true), "ปิดรับสมัครแล้ว · คุณสมัครไว้แล้ว");
 });

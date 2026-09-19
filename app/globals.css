@@ -601,3 +601,28 @@ input[type=checkbox],input[type=radio]{accent-color:var(--accent);cursor:pointer
 
 .cd-card>.cd-now,p.cd-now{margin:6px 0;font-size:17px;font-weight:650;color:var(--stop)}
 .cd-prep .btn{align-self:flex-start;margin-top:4px}
+
+/* ── สมัครสอบ (การ์ดนับถอยหลัง) ──────────────────────────────────────────── */
+.cd-signed{border-color:var(--good)}
+.pill.cd-tag{margin-left:auto;font-size:11px}
+.cd-deadline{margin:2px 0 0;font-size:12.5px;color:var(--ink-soft)}
+.cd-deadline.is-warn{color:var(--warn);font-weight:650}
+.cd-deadline.is-closed{color:var(--ink-faint)}
+.cd-deadline-date{color:var(--ink-faint);font-weight:400}
+.cd-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.cd-actions .muted{font-size:12px}
+
+/* ── แดชบอร์ดการสมัครของศูนย์ ────────────────────────────────────────────── */
+/* ตัวเลขสรุปวางเป็นแถบเดียว ให้ยอดที่ต้องลงมือ (ยังไม่สมัคร / ต้องตรวจ) สะดุดตากว่ายอดเฉย ๆ */
+.reg-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;
+  background:var(--line-soft);border:1px solid var(--line);border-radius:var(--radius-sm);
+  overflow:hidden;margin:12px 0}
+.reg-tile{background:var(--surface);padding:10px 14px;display:flex;flex-direction:column;gap:2px}
+.reg-tile>span{font-size:11.5px;font-weight:600;color:var(--ink-faint)}
+.reg-tile>b{font-size:22px;font-weight:650;font-variant-numeric:tabular-nums}
+.reg-good>b{color:var(--good)}
+.reg-warn{background:var(--warn-tint)}
+.reg-warn>b{color:var(--warn)}
+.reg-stop{background:var(--stop-tint)}
+.reg-stop>b{color:var(--stop)}
+.reg-dash{margin-bottom:18px}
